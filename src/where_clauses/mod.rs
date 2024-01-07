@@ -22,7 +22,7 @@ pub trait WhereClauses {
     fn where_subquery(
         &mut self,
         value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder,
-    ) -> &mut Self;
+    );
     fn or(&mut self) -> &mut ChainBuilder;
     fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self;
 }
@@ -42,14 +42,12 @@ impl WhereClauses for ChainBuilder {
     fn where_subquery(
         &mut self,
         mut value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder,
-    ) -> &mut Self {
+    ) {
         let mut chain = self.clone();
         chain.statement = vec![];
         chain.raw = None;
         value(&mut chain);
         self.statement.push(Statement::SubChain(Box::new(chain)));
-        // SAFETY: unwrap() is safe because we just pushed a SubChain
-        self.statement.last_mut().unwrap().to_chain_builder()
     }
 
     fn or(&mut self) -> &mut ChainBuilder {
