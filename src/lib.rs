@@ -137,7 +137,7 @@ impl ChainBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{ChainBuilder, Client, JoinBuilderMethods, Select, WhereClauses, JoinMethods};
+    use super::{ChainBuilder, Client, JoinBuilderMethods, JoinMethods, Select, WhereClauses};
 
     #[test]
     fn test_chain_builder() {
