@@ -94,7 +94,7 @@ impl ChainBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{ChainBuilder, WhereClauses, Client, Select};
+    use super::{ChainBuilder, Client, Select, WhereClauses};
 
     #[test]
     fn test_chain_builder() {
@@ -116,10 +116,13 @@ mod tests {
             sub.where_eq("status", serde_json::Value::String("active".to_string()));
             sub.or()
                 .where_eq("status", serde_json::Value::String("pending".to_string()))
-                .where_between("registered_at", [
-                    serde_json::Value::String("2024-01-01".to_string()),
-                    serde_json::Value::String("2024-01-31".to_string()),
-                ]);
+                .where_between(
+                    "registered_at",
+                    [
+                        serde_json::Value::String("2024-01-01".to_string()),
+                        serde_json::Value::String("2024-01-31".to_string()),
+                    ],
+                );
             sub
         });
 

@@ -33,7 +33,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 statement_sql.push_str(field);
                 statement_sql.push(' ');
                 let (operator_str, is_bind) = operator_to_sql(operator);
-                if operator.to_owned() == Operator::Between || operator.to_owned() == Operator::NotBetween {
+                if *operator == Operator::Between || *operator == Operator::NotBetween {
                     statement_sql.push_str(operator_str);
                     statement_sql.push_str(" ? AND ?");
                     for v in value.as_array().unwrap() {
@@ -51,7 +51,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                                 } else {
                                     statement_sql.push(',');
                                 }
-                                statement_sql.push_str("?");
+                                statement_sql.push('?');
                                 to_binds.push(v.clone());
                             }
                             statement_sql.push(')');
