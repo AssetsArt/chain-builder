@@ -137,9 +137,7 @@ impl ChainBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::join_methods::JoinMethods;
-
-    use super::{ChainBuilder, Client, JoinBuilderMethods, Select, WhereClauses};
+    use super::{ChainBuilder, Client, JoinBuilderMethods, Select, WhereClauses, JoinMethods};
 
     #[test]
     fn test_chain_builder() {
