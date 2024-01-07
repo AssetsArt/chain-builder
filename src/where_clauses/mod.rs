@@ -1,4 +1,4 @@
-use crate::{operator::Operator, ChainBuilder, Method, Statement};
+use crate::{operator::Operator, ChainBuilder, Statement};
 
 pub trait WhereClauses {
     fn where_clause(
@@ -23,7 +23,7 @@ pub trait WhereClauses {
         &mut self,
         value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder,
     ) -> &mut Self;
-    fn or(&mut self) -> &mut Self;
+    fn or(&mut self) -> &mut ChainBuilder;
     fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self;
 }
 
@@ -43,25 +43,27 @@ impl WhereClauses for ChainBuilder {
         &mut self,
         mut value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder,
     ) -> &mut Self {
-        let mut chain = ChainBuilder::new(self.client.clone());
+        let mut chain = self.clone();
+        chain.statement = vec![];
+        chain.raw = None;
         value(&mut chain);
         self.statement.push(Statement::SubChain(Box::new(chain)));
-        self
+        match self.statement.last_mut() {
+            Some(Statement::SubChain(chain)) => chain,
+            _ => panic!("ChainBuilder::where_subquery()"),
+        }
     }
 
-    fn or(&mut self) -> &mut Self {
+    fn or(&mut self) -> &mut ChainBuilder {
+        let mut chain = self.clone();
+        chain.statement = vec![];
+        chain.raw = None;
         self.statement
-            .push(Statement::OrChain(Box::new(ChainBuilder {
-                client: self.client.clone(),
-                table: self.table.clone(),
-                select: self.select.clone(),
-                as_name: self.as_name.clone(),
-                statement: vec![],
-                raw: None,
-                method: Method::None,
-                db: self.db.clone(),
-            })));
-        self
+            .push(Statement::OrChain(Box::new(chain)));
+        match self.statement.last_mut() {
+            Some(Statement::OrChain(chain)) => chain,
+            _ => panic!("ChainBuilder::or()"),
+        }
     }
 
     fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self {

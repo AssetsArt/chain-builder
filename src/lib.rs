@@ -23,6 +23,17 @@ pub enum Statement {
     Raw((String, Option<Vec<serde_json::Value>>)),
 }
 
+impl Statement {
+    pub fn to_chain_builder(&mut self) -> &mut ChainBuilder {
+        match self {
+            Statement::AndChain(chain) => chain,
+            Statement::OrChain(chain) => chain,
+            Statement::SubChain(chain) => chain,
+            _ => panic!("Statement::to_chain_builder()"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum Method {
     Select,
@@ -141,5 +152,26 @@ mod tests {
         let sql = builder.to_sql();
         println!("final sql: {}", sql.0);
         println!("final binds: {:?}", sql.1);
+        assert_eq!(
+            sql.0,
+            "SELECT * FROM mydb.users WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)"
+        );
+        assert_eq!(
+            sql.1,
+            Some(vec![
+                serde_json::Value::String("John".to_string()),
+                serde_json::Value::String("New York".to_string()),
+                serde_json::Value::String("IT".to_string()),
+                serde_json::Value::String("HR".to_string()),
+                serde_json::Value::String("active".to_string()),
+                serde_json::Value::String("pending".to_string()),
+                serde_json::Value::String("2024-01-01".to_string()),
+                serde_json::Value::String("2024-01-31".to_string()),
+                serde_json::Value::Number(serde_json::Number::from_f64(40.0).unwrap()),
+                serde_json::Value::Number(serde_json::Number::from_f64(41.0).unwrap()),
+                serde_json::Value::Number(serde_json::Number::from_f64(70.0).unwrap()),
+                serde_json::Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
+            ])
+        );
     }
 }

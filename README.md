@@ -48,7 +48,7 @@ builder.where_raw((
 ));
 let sql = builder.to_sql();
 println!("final sql: {}", sql.0);
-// SELECT * FROM mydb.users WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR status = ? AND registered_at BETWEEN ? AND ?) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)
+// SELECT * FROM mydb.users WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)
 println!("final binds: {:?}", sql.1);
 // Some([String("John"), String("New York"), String("IT"), String("HR"), String("active"), String("pending"), String("2024-01-01"), String("2024-01-31"), Number(40.0), Number(41.0), Number(70.0), Number(71.0)])
 ```

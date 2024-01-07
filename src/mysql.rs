@@ -25,8 +25,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
         match statement {
             Statement::Value(field, operator, value) => {
                 if i > 0 {
-                    if let Statement::OrChain(_) = c.statement[i - 1] {
-                    } else {
+                    if c.statement.get(i - 1).is_some() {
                         statement_sql.push_str(" AND ");
                     }
                 }
@@ -77,7 +76,11 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                     statement_sql.push_str(" OR ");
                 }
                 let (sql, binds) = chain.delegate_to_sql(true);
-                statement_sql.push_str(&sql);
+                if chain.statement.len() > 1 {
+                    statement_sql.push_str(&format!("({})", sql));
+                } else {
+                    statement_sql.push_str(&sql);
+                }
                 if let Some(binds) = binds {
                     to_binds.extend(binds);
                 }
@@ -86,13 +89,11 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 if i > 0 {
                     statement_sql.push_str(" AND ");
                 }
-                statement_sql.push('(');
                 let (sql, binds) = chain.delegate_to_sql(true);
-                statement_sql.push_str(&sql);
+                statement_sql.push_str(&format!("({})", sql));
                 if let Some(binds) = binds {
                     to_binds.extend(binds);
                 }
-                statement_sql.push(')');
             }
             Statement::Raw((sql, binds)) => {
                 if i > 0 {
