@@ -25,8 +25,13 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
         match statement {
             Statement::Value(field, operator, value) => {
                 if i > 0 {
-                    if c.statement.get(i - 1).is_some() {
-                        statement_sql.push_str(" AND ");
+                    if let Some(s) = c.statement.get(i - 1) {
+                        match s {
+                            Statement::OrChain(_) => {}
+                            _ => {
+                                statement_sql.push_str(" AND ");
+                            }
+                        }
                     }
                 }
                 statement_sql.push_str(field);

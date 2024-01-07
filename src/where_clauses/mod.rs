@@ -58,8 +58,7 @@ impl WhereClauses for ChainBuilder {
         let mut chain = self.clone();
         chain.statement = vec![];
         chain.raw = None;
-        self.statement
-            .push(Statement::OrChain(Box::new(chain)));
+        self.statement.push(Statement::OrChain(Box::new(chain)));
         match self.statement.last_mut() {
             Some(Statement::OrChain(chain)) => chain,
             _ => panic!("ChainBuilder::or()"),
