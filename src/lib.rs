@@ -81,51 +81,59 @@ impl ChainBuilder {
         self
     }
 
-    pub fn to_sql(&self, is_statement: bool) -> (String, Option<Vec<serde_json::Value>>) {
+    fn delegate_to_sql(&self, is_statement: bool) -> (String, Option<Vec<serde_json::Value>>) {
         match self.client {
             Client::Mysql => mysql::to_sql(self, is_statement),
         }
+    }
+
+    pub fn to_sql(&self) -> (String, Option<Vec<serde_json::Value>>) {
+        self.delegate_to_sql(false)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{ChainBuilder, WhereClauses, Client, Select};
 
     #[test]
     fn test_chain_builder() {
         let mut builder = ChainBuilder::new(Client::Mysql);
-        builder.db("test"); // For dynamic db
+        builder.db("mydb"); // For dynamic db
         builder.select(Select::Columns(vec!["*".into()]));
         builder.from("users");
-        builder.where_eq("name", serde_json::Value::String("test".to_string()));
-        builder.where_eq("age", serde_json::Value::Number(20.into()));
+        builder.where_eq("name", serde_json::Value::String("John".to_string()));
+        builder.where_eq("city", serde_json::Value::String("New York".to_string()));
         builder.where_in(
-            "id",
+            "department",
             vec![
-                serde_json::Value::Number(1.into()),
-                serde_json::Value::Number(2.into()),
-                serde_json::Value::Number(3.into()),
+                serde_json::Value::String("IT".to_string()),
+                serde_json::Value::String("HR".to_string()),
             ],
         );
 
         builder.where_subquery(|sub| {
-            sub.where_eq("name", serde_json::Value::String("test".to_string()));
+            sub.where_eq("status", serde_json::Value::String("active".to_string()));
             sub.or()
-                .where_eq("age", serde_json::Value::Number(20.into()))
-                .where_exists("id");
+                .where_eq("status", serde_json::Value::String("pending".to_string()))
+                .where_between("registered_at", [
+                    serde_json::Value::String("2024-01-01".to_string()),
+                    serde_json::Value::String("2024-01-31".to_string()),
+                ]);
             sub
         });
 
         builder.where_raw((
-            "name = ? AND age = ?".to_string(),
+            "(latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)".into(),
             Some(vec![
-                serde_json::Value::String("test".to_string()),
-                serde_json::Value::Number(20.into()),
+                serde_json::Value::Number(serde_json::Number::from_f64(40.0).unwrap()),
+                serde_json::Value::Number(serde_json::Number::from_f64(41.0).unwrap()),
+                serde_json::Value::Number(serde_json::Number::from_f64(70.0).unwrap()),
+                serde_json::Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
             ]),
         ));
 
-        let sql = builder.to_sql(false);
+        let sql = builder.to_sql();
         println!("final sql: {}", sql.0);
         println!("final binds: {:?}", sql.1);
     }

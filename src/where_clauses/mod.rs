@@ -15,8 +15,8 @@ pub trait WhereClauses {
     fn where_not_null(&mut self, column: &str) -> &mut Self;
     fn where_exists(&mut self, column: &str) -> &mut Self;
     fn where_not_exists(&mut self, column: &str) -> &mut Self;
-    fn where_between(&mut self, column: &str, value: Vec<serde_json::Value>) -> &mut Self;
-    fn where_not_between(&mut self, column: &str, value: Vec<serde_json::Value>) -> &mut Self;
+    fn where_between(&mut self, column: &str, value: [serde_json::Value; 2]) -> &mut Self;
+    fn where_not_between(&mut self, column: &str, value: [serde_json::Value; 2]) -> &mut Self;
     fn where_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
     fn where_not_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
     fn where_subquery(
@@ -101,15 +101,19 @@ impl WhereClauses for ChainBuilder {
         self.where_clause(column, Operator::NotExists, serde_json::Value::Null)
     }
 
-    fn where_between(&mut self, column: &str, value: Vec<serde_json::Value>) -> &mut Self {
-        self.where_clause(column, Operator::Between, serde_json::Value::Array(value))
+    fn where_between(&mut self, column: &str, value: [serde_json::Value; 2]) -> &mut Self {
+        self.where_clause(
+            column,
+            Operator::Between,
+            serde_json::Value::Array(vec![value[0].clone(), value[1].clone()]),
+        )
     }
 
-    fn where_not_between(&mut self, column: &str, value: Vec<serde_json::Value>) -> &mut Self {
+    fn where_not_between(&mut self, column: &str, value: [serde_json::Value; 2]) -> &mut Self {
         self.where_clause(
             column,
             Operator::NotBetween,
-            serde_json::Value::Array(value),
+            serde_json::Value::Array(vec![value[0].clone(), value[1].clone()]),
         )
     }
 

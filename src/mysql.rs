@@ -32,22 +32,41 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 }
                 statement_sql.push_str(field);
                 statement_sql.push(' ');
-                let (operator, is_bind) = operator_to_sql(operator);
-                statement_sql.push_str(operator);
-                if is_bind {
-                    if let serde_json::Value::Array(_) = value {
-                        statement_sql.push_str(" (?)");
-                    } else {
-                        statement_sql.push_str(" ?");
+                let (operator_str, is_bind) = operator_to_sql(operator);
+                if operator.to_owned() == Operator::Between || operator.to_owned() == Operator::NotBetween {
+                    statement_sql.push_str(operator_str);
+                    statement_sql.push_str(" ? AND ?");
+                    for v in value.as_array().unwrap() {
+                        to_binds.push(v.clone());
                     }
-                    to_binds.push(value.clone());
+                } else {
+                    statement_sql.push_str(operator_str);
+                    if is_bind {
+                        if let serde_json::Value::Array(_) = value {
+                            statement_sql.push_str(" (");
+                            let mut is_first = true;
+                            for v in value.as_array().unwrap_or(&vec![]) {
+                                if is_first {
+                                    is_first = false;
+                                } else {
+                                    statement_sql.push(',');
+                                }
+                                statement_sql.push_str("?");
+                                to_binds.push(v.clone());
+                            }
+                            statement_sql.push(')');
+                        } else {
+                            statement_sql.push_str(" ?");
+                            to_binds.push(value.clone());
+                        }
+                    }
                 }
             }
             Statement::AndChain(chain) => {
                 if i > 0 {
                     statement_sql.push_str(" AND ");
                 }
-                let (sql, binds) = chain.to_sql(true);
+                let (sql, binds) = chain.delegate_to_sql(true);
                 statement_sql.push_str(&sql);
                 if let Some(binds) = binds {
                     to_binds.extend(binds);
@@ -57,7 +76,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 if i > 0 {
                     statement_sql.push_str(" OR ");
                 }
-                let (sql, binds) = chain.to_sql(true);
+                let (sql, binds) = chain.delegate_to_sql(true);
                 statement_sql.push_str(&sql);
                 if let Some(binds) = binds {
                     to_binds.extend(binds);
@@ -68,7 +87,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                     statement_sql.push_str(" AND ");
                 }
                 statement_sql.push('(');
-                let (sql, binds) = chain.to_sql(true);
+                let (sql, binds) = chain.delegate_to_sql(true);
                 statement_sql.push_str(&sql);
                 if let Some(binds) = binds {
                     to_binds.extend(binds);
@@ -107,7 +126,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 }
             }
             Select::Builder(builder) => {
-                let (sql, binds) = builder.to_sql(true);
+                let (sql, binds) = builder.delegate_to_sql(true);
                 to_sql.push_str(&sql);
                 if let Some(binds) = binds {
                     to_binds.extend(binds.clone());
