@@ -1,4 +1,9 @@
 # Chain builder
+
+[![Documentation](https://img.shields.io/badge/docs.rs-chain--builder-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white)](https://docs.rs/chain-builder)
+[![Version](https://img.shields.io/crates/v/chain-builder?style=for-the-badge)](https://crates.io/crates/chain-builder)
+[![License](https://img.shields.io/crates/l/chain-builder?style=for-the-badge)](https://crates.io/crates/chain-builder)
+
 A query builder for MySQL for Rust is designed to be flexible and easy to use.
 
 ## Installation
