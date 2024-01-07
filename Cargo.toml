@@ -3,6 +3,11 @@ name = "chain-builder"
 version = "0.1.0"
 edition = "2021"
 description = "A query builder for MySQL for Rust is designed to be flexible and easy to use."
+license = "MIT"
+readme = "README.md"
+keywords = ["mysql", "query", "builder", "rust"]
+categories = ["database", "mysql", "query", "builder", "rust"]
+repository = "https://github.com/Aitthi/chain-builder.git"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
