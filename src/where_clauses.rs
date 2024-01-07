@@ -1,4 +1,4 @@
-use crate::{operator::Operator, ChainBuilder, Statement};
+use crate::{operator::Operator, QueryBuilder, Statement};
 
 pub trait WhereClauses {
     fn where_clause(
@@ -19,15 +19,12 @@ pub trait WhereClauses {
     fn where_not_between(&mut self, column: &str, value: [serde_json::Value; 2]) -> &mut Self;
     fn where_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
     fn where_not_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
-    fn where_subquery(
-        &mut self,
-        value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder,
-    );
-    fn or(&mut self) -> &mut ChainBuilder;
+    fn where_subquery(&mut self, value: impl FnMut(&mut QueryBuilder) -> &mut QueryBuilder);
+    fn or(&mut self) -> &mut QueryBuilder;
     fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self;
 }
 
-impl WhereClauses for ChainBuilder {
+impl WhereClauses for QueryBuilder {
     fn where_clause(
         &mut self,
         column: &str,
@@ -39,24 +36,21 @@ impl WhereClauses for ChainBuilder {
         self
     }
 
-    fn where_subquery(
-        &mut self,
-        mut value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder,
-    ) {
-        let mut chain = self.clone();
-        chain.statement = vec![];
-        chain.raw = None;
-        value(&mut chain);
-        self.statement.push(Statement::SubChain(Box::new(chain)));
+    fn where_subquery(&mut self, mut value: impl FnMut(&mut QueryBuilder) -> &mut QueryBuilder) {
+        let mut query = self.clone();
+        query.statement = vec![];
+        query.raw = None;
+        value(&mut query);
+        self.statement.push(Statement::SubChain(Box::new(query)));
     }
 
-    fn or(&mut self) -> &mut ChainBuilder {
+    fn or(&mut self) -> &mut QueryBuilder {
         let mut chain = self.clone();
         chain.statement = vec![];
         chain.raw = None;
         self.statement.push(Statement::OrChain(Box::new(chain)));
         // SAFETY: unwrap() is safe because we just pushed an OrChain
-        self.statement.last_mut().unwrap().to_chain_builder()
+        self.statement.last_mut().unwrap().to_query_builder()
     }
 
     fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self {
