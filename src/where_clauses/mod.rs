@@ -50,6 +50,7 @@ impl WhereClauses for ChainBuilder {
         self.statement.push(Statement::SubChain(Box::new(chain)));
         match self.statement.last_mut() {
             Some(Statement::SubChain(chain)) => chain,
+            // PANIC: This should never happen because we just pushed a SubChain
             _ => panic!("ChainBuilder::where_subquery()"),
         }
     }
@@ -61,6 +62,7 @@ impl WhereClauses for ChainBuilder {
         self.statement.push(Statement::OrChain(Box::new(chain)));
         match self.statement.last_mut() {
             Some(Statement::OrChain(chain)) => chain,
+            // PANIC: This should never happen because we just pushed an OrChain
             _ => panic!("ChainBuilder::or()"),
         }
     }
