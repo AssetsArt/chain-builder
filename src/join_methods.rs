@@ -1,11 +1,7 @@
 use crate::{JoinBuilder, JoinStatement, QueryBuilder};
 
 pub trait JoinMethods {
-    fn join(
-        &mut self,
-        table: &str,
-        on: impl FnMut(&mut JoinBuilder) -> &mut JoinBuilder,
-    ) -> &mut Self;
+    fn join(&mut self, table: &str, on: impl FnMut(&mut JoinBuilder));
 }
 
 pub trait JoinBuilderMethods {
@@ -33,11 +29,7 @@ impl JoinBuilderMethods for JoinBuilder {
 }
 
 impl JoinMethods for QueryBuilder {
-    fn join(
-        &mut self,
-        table: &str,
-        mut on: impl FnMut(&mut JoinBuilder) -> &mut JoinBuilder,
-    ) -> &mut Self {
+    fn join(&mut self, table: &str, mut on: impl FnMut(&mut JoinBuilder)) {
         let mut join = JoinBuilder {
             table: table.to_string(),
             statement: vec![],
@@ -45,6 +37,5 @@ impl JoinMethods for QueryBuilder {
         };
         on(&mut join);
         self.join.push(join);
-        self
     }
 }

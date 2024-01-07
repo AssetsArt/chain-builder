@@ -130,11 +130,8 @@ impl ChainBuilder {
         self.delegate_to_sql(false)
     }
 
-    pub fn query(
-        &mut self,
-        mut query: impl FnMut(&mut QueryBuilder) -> &mut QueryBuilder,
-    ) -> &mut QueryBuilder {
-        query(&mut self.query)
+    pub fn query(&mut self, mut query: impl FnMut(&mut QueryBuilder)) {
+        query(&mut self.query);
     }
 }
 
@@ -172,7 +169,6 @@ mod tests {
                             serde_json::Value::String("2024-01-31".to_string()),
                         ],
                     );
-                sub
             });
 
             qb.where_raw((
@@ -184,7 +180,6 @@ mod tests {
                     serde_json::Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
                 ]),
             ));
-            qb
         });
 
         let sql = builder.to_sql();
@@ -228,10 +223,8 @@ mod tests {
                     "=",
                     "users.d_id_w",
                 );
-                join
             });
             qb.where_eq("name", serde_json::Value::String("John".to_string()));
-            qb
         });
         let sql = builder.to_sql();
         println!("final sql: {}", sql.0);

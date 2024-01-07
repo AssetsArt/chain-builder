@@ -39,7 +39,6 @@ builder.query(|qb| {
                     serde_json::Value::String("2024-01-31".to_string()),
                 ],
             );
-        sub
     });
     qb.where_raw((
         "(latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)".into(),
@@ -50,7 +49,6 @@ builder.query(|qb| {
             serde_json::Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
         ]),
     ));
-    qb
 });
 let sql = builder.to_sql();
 println!("final sql: {}", sql.0);
