@@ -1,9 +1,9 @@
 use operator::Operator;
 
 // mod
+pub mod mysql;
 pub mod operator;
 pub mod where_clauses;
-pub mod mysql;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Client {
@@ -96,9 +96,7 @@ mod tests {
     fn test_chain_builder() {
         let mut builder = ChainBuilder::new(Client::Mysql);
         builder.db("test"); // For dynamic db
-        builder.select(Select::Columns(vec![
-            "*".into(),
-        ]));
+        builder.select(Select::Columns(vec!["*".into()]));
         builder.from("users");
         builder.where_eq("name", serde_json::Value::String("test".to_string()));
         builder.where_eq("age", serde_json::Value::Number(20.into()));
@@ -118,7 +116,6 @@ mod tests {
                 .where_exists("id");
             sub
         });
-        
 
         builder.where_raw((
             "name = ? AND age = ?".to_string(),

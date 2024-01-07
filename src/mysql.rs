@@ -31,7 +31,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                     }
                 }
                 statement_sql.push_str(field);
-                statement_sql.push_str(" ");
+                statement_sql.push(' ');
                 let (operator, is_bind) = operator_to_sql(operator);
                 statement_sql.push_str(operator);
                 if is_bind {
@@ -67,13 +67,13 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 if i > 0 {
                     statement_sql.push_str(" AND ");
                 }
-                statement_sql.push_str("(");
+                statement_sql.push('(');
                 let (sql, binds) = chain.to_sql(true);
                 statement_sql.push_str(&sql);
                 if let Some(binds) = binds {
                     to_binds.extend(binds);
                 }
-                statement_sql.push_str(")");
+                statement_sql.push(')');
             }
             Statement::Raw((sql, binds)) => {
                 if i > 0 {
@@ -115,13 +115,12 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
             }
         }
     } else {
-        to_sql.push_str("*");
+        to_sql.push('*');
     }
     to_sql.push_str(" FROM ");
-    // to_sql.push_str(&c.table);
     if let Some(db) = &c.db {
         to_sql.push_str(db);
-        to_sql.push_str(".");
+        to_sql.push('.');
     }
     to_sql.push_str(&c.table);
     if let Some(as_name) = &c.as_name {
@@ -133,7 +132,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
         to_sql.push_str(&statement_sql);
     }
     if let Some(raw) = &c.raw {
-        to_sql.push_str(" ");
+        to_sql.push(' ');
         to_sql.push_str(&raw.0);
         if let Some(binds) = &raw.1 {
             to_binds.extend(binds.clone());

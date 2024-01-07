@@ -19,7 +19,10 @@ pub trait WhereClauses {
     fn where_not_between(&mut self, column: &str, value: Vec<serde_json::Value>) -> &mut Self;
     fn where_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
     fn where_not_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
-    fn where_subquery(&mut self, value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder) -> &mut Self;
+    fn where_subquery(
+        &mut self,
+        value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder,
+    ) -> &mut Self;
     fn or(&mut self) -> &mut Self;
     fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self;
 }
@@ -36,7 +39,10 @@ impl WhereClauses for ChainBuilder {
         self
     }
 
-    fn where_subquery(&mut self, mut value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder) -> &mut Self {
+    fn where_subquery(
+        &mut self,
+        mut value: impl FnMut(&mut ChainBuilder) -> &mut ChainBuilder,
+    ) -> &mut Self {
         let mut chain = ChainBuilder::new(self.client.clone());
         value(&mut chain);
         self.statement.push(Statement::SubChain(Box::new(chain)));
