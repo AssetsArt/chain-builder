@@ -235,7 +235,7 @@ mod tests {
         println!("final binds: {:?}", sql.1);
         assert_eq!(
             sql.0,
-            "SELECT *, (SELECT COUNT(*) FROM mydb.users WHERE users.id = details.id) AS count FROM mydb.users JOIN details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
+            "SELECT *, (SELECT COUNT(*) FROM mydb.users WHERE users.id = details.id) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
         );
     }
 }

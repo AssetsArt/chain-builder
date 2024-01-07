@@ -182,7 +182,12 @@ fn join_to_sql(c: &ChainBuilder, prefix: bool) -> (String, Option<Vec<serde_json
         if i > 0 {
             to_sql_str.push(' ');
         } else if prefix {
-            to_sql_str.push_str(&format!("{} {} ON ", join.join_type, join.table));
+            let table = if let Some(db) = &c.db {
+                format!("{}.{}", db, join.table)
+            } else {
+                join.table.clone()
+            };
+            to_sql_str.push_str(&format!("{} {} ON ", join.join_type, table));
         }
         for (j, statement) in join.statement.iter().enumerate() {
             match statement {
