@@ -1,5 +1,7 @@
 // mod
+#[cfg(feature = "mysql")]
 mod mysql;
+
 mod operator;
 mod where_clauses;
 
