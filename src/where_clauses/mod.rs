@@ -48,11 +48,8 @@ impl WhereClauses for ChainBuilder {
         chain.raw = None;
         value(&mut chain);
         self.statement.push(Statement::SubChain(Box::new(chain)));
-        match self.statement.last_mut() {
-            Some(Statement::SubChain(chain)) => chain,
-            // PANIC: This should never happen because we just pushed a SubChain
-            _ => panic!("ChainBuilder::where_subquery()"),
-        }
+        // SAFETY: unwrap() is safe because we just pushed a SubChain
+        self.statement.last_mut().unwrap().to_chain_builder()
     }
 
     fn or(&mut self) -> &mut ChainBuilder {
@@ -60,11 +57,8 @@ impl WhereClauses for ChainBuilder {
         chain.statement = vec![];
         chain.raw = None;
         self.statement.push(Statement::OrChain(Box::new(chain)));
-        match self.statement.last_mut() {
-            Some(Statement::OrChain(chain)) => chain,
-            // PANIC: This should never happen because we just pushed an OrChain
-            _ => panic!("ChainBuilder::or()"),
-        }
+        // SAFETY: unwrap() is safe because we just pushed an OrChain
+        self.statement.last_mut().unwrap().to_chain_builder()
     }
 
     fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self {
