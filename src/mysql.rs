@@ -112,28 +112,38 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
     if c.method == Method::Select {
         to_sql_str.push_str("SELECT ");
     }
-    if let Some(select) = &c.select {
-        match select {
-            Select::Columns(columns) => {
-                to_sql_str.push_str(&columns.join(", "));
+
+    if c.select.is_empty() {
+        to_sql_str.push('*');
+    } else {
+        let mut is_first = true;
+        for select in &c.select {
+            if is_first {
+                is_first = false;
+            } else {
+                to_sql_str.push_str(", ");
             }
-            Select::Raw((sql, binds)) => {
-                to_sql_str.push_str(sql);
-                if let Some(binds) = binds {
-                    to_binds.extend(binds.clone());
+            match select {
+                Select::Columns(columns) => {
+                    to_sql_str.push_str(&columns.join(", "));
                 }
-            }
-            Select::Builder(subc) => {
-                let (sql, binds) = to_sql(subc, true);
-                to_sql_str.push_str(&sql);
-                if let Some(binds) = binds {
-                    to_binds.extend(binds.clone());
+                Select::Raw((sql, binds)) => {
+                    to_sql_str.push_str(sql);
+                    if let Some(binds) = binds {
+                        to_binds.extend(binds.clone());
+                    }
+                }
+                Select::Builder(subc) => {
+                    let (sql, binds) = to_sql(subc, true);
+                    to_sql_str.push_str(&sql);
+                    if let Some(binds) = binds {
+                        to_binds.extend(binds.clone());
+                    }
                 }
             }
         }
-    } else {
-        to_sql_str.push('*');
     }
+
     to_sql_str.push_str(" FROM ");
     if let Some(db) = &c.db {
         to_sql_str.push_str(db);

@@ -45,7 +45,7 @@ pub struct ChainBuilder {
     db: Option<String>,
     table: String,
     as_name: Option<String>,
-    select: Option<Select>,
+    select: Vec<Select>,
     query: QueryBuilder,
     method: Method,
 }
@@ -91,7 +91,7 @@ impl ChainBuilder {
         ChainBuilder {
             client,
             table: String::new(),
-            select: None,
+            select: Vec::new(),
             as_name: None,
             db: None,
             query: QueryBuilder::default(),
@@ -111,7 +111,7 @@ impl ChainBuilder {
 
     pub fn select(&mut self, select: Select) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select = Some(select);
+        self.select.push(select);
         self
     }
 
@@ -213,6 +213,10 @@ mod tests {
         let mut builder = ChainBuilder::new(Client::Mysql);
         builder.db("mydb"); // For dynamic db
         builder.select(Select::Columns(vec!["*".into()]));
+        builder.select(Select::Raw((
+            "(SELECT COUNT(*) FROM mydb.users WHERE users.id = details.id) AS count".into(),
+            Some(vec![]),
+        )));
         builder.from("users");
         builder.query(|qb| {
             qb.join("details", |join| {
@@ -231,7 +235,7 @@ mod tests {
         println!("final binds: {:?}", sql.1);
         assert_eq!(
             sql.0,
-            "SELECT * FROM mydb.users JOIN details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
+            "SELECT *, (SELECT COUNT(*) FROM mydb.users WHERE users.id = details.id) AS count FROM mydb.users JOIN details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
         );
     }
 }
