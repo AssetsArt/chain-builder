@@ -42,10 +42,10 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 } else {
                     statement_sql.push_str(operator_str);
                     if is_bind {
-                        if let serde_json::Value::Array(_) = value {
+                        if let serde_json::Value::Array(value) = value {
                             statement_sql.push_str(" (");
                             let mut is_first = true;
-                            for v in value.as_array().unwrap_or(&vec![]) {
+                            value.iter().for_each(|v| {
                                 if is_first {
                                     is_first = false;
                                 } else {
@@ -53,7 +53,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                                 }
                                 statement_sql.push('?');
                                 to_binds.push(v.clone());
-                            }
+                            });
                             statement_sql.push(')');
                         } else {
                             statement_sql.push_str(" ?");
