@@ -1,9 +1,11 @@
-use operator::Operator;
-
 // mod
-pub mod mysql;
-pub mod operator;
-pub mod where_clauses;
+mod mysql;
+mod operator;
+mod where_clauses;
+
+// export
+pub use operator::Operator;
+pub use where_clauses::WhereClauses;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Client {
@@ -88,8 +90,6 @@ impl ChainBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::where_clauses::WhereClauses;
-
     use super::*;
 
     #[test]
