@@ -165,11 +165,20 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
         to_sql_str.push_str(" WHERE ");
         to_sql_str.push_str(&statement_sql);
     }
-    if let Some(raw) = &c.query.raw {
-        to_sql_str.push(' ');
-        to_sql_str.push_str(&raw.0);
-        if let Some(binds) = &raw.1 {
-            to_binds.extend(binds.clone());
+    // if let Some(raw) = &c.query.raw {
+    //     to_sql_str.push(' ');
+    //     to_sql_str.push_str(&raw.0);
+    //     if let Some(binds) = &raw.1 {
+    //         to_binds.extend(binds.clone());
+    //     }
+    // }
+    if !c.query.raw.is_empty() {
+        for raw in &c.query.raw {
+            to_sql_str.push(' ');
+            to_sql_str.push_str(&raw.0);
+            if let Some(binds) = &raw.1 {
+                to_binds.extend(binds.clone());
+            }
         }
     }
     (to_sql_str, Some(to_binds))

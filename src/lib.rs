@@ -53,7 +53,7 @@ pub struct ChainBuilder {
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QueryBuilder {
     statement: Vec<Statement>,
-    raw: Option<(String, Option<Vec<serde_json::Value>>)>,
+    raw: Vec<(String, Option<Vec<serde_json::Value>>)>,
     join: Vec<JoinBuilder>,
 }
 
@@ -135,7 +135,7 @@ impl ChainBuilder {
     }
 
     pub fn add_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) {
-        self.query.raw = Some(raw);
+        self.query.raw.push(raw);
     }
 }
 

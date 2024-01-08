@@ -39,7 +39,7 @@ impl WhereClauses for QueryBuilder {
     fn where_subquery(&mut self, mut value: impl FnMut(&mut QueryBuilder)) {
         let mut query = self.clone();
         query.statement = vec![];
-        query.raw = None;
+        query.raw = vec![];
         value(&mut query);
         self.statement.push(Statement::SubChain(Box::new(query)));
     }
@@ -47,7 +47,7 @@ impl WhereClauses for QueryBuilder {
     fn or(&mut self) -> &mut QueryBuilder {
         let mut chain = self.clone();
         chain.statement = vec![];
-        chain.raw = None;
+        chain.raw = vec![];
         self.statement.push(Statement::OrChain(Box::new(chain)));
         // SAFETY: unwrap() is safe because we just pushed an OrChain
         self.statement.last_mut().unwrap().to_query_builder()
