@@ -242,9 +242,7 @@ mod tests {
         });
         builder.select(Select::Raw((
             "(SELECT COUNT(*) FROM mydb.users WHERE users.id = ?) AS count".into(),
-            Some(vec![
-                serde_json::Value::Number(1.into()),
-            ]),
+            Some(vec![serde_json::Value::Number(1.into())]),
         )));
         let sql = builder.to_sql();
         println!("final sql: {}", sql.0);
