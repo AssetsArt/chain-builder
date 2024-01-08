@@ -18,9 +18,17 @@ pub fn operator_to_sql(operator: &Operator) -> (&str, bool) {
     }
 }
 
-pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde_json::Value>>) {
+pub struct ToSql {
+    pub sql: String,
+    pub binds: Option<Vec<serde_json::Value>>,
+    pub select_binds: Option<Vec<serde_json::Value>>,
+    pub join_binds: Option<Vec<serde_json::Value>>,
+}
+pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> ToSql {
     let mut statement_sql = String::new();
     let mut to_binds: Vec<serde_json::Value> = vec![];
+    let mut to_select_binds: Vec<serde_json::Value> = vec![];
+    let mut to_join_binds: Vec<serde_json::Value> = vec![];
     for (i, statement) in c.query.statement.iter().enumerate() {
         match statement {
             Statement::Value(field, operator, value) => {
@@ -70,14 +78,20 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 }
                 let mut c = c.clone();
                 c.query = *qb.clone();
-                let (sql, binds) = to_sql(&c, true);
+                let rs_tosql = to_sql(&c, true);
                 if qb.statement.len() > 1 {
-                    statement_sql.push_str(&format!("({})", sql));
+                    statement_sql.push_str(&format!("({})", rs_tosql.sql));
                 } else {
-                    statement_sql.push_str(&sql);
+                    statement_sql.push_str(&rs_tosql.sql);
                 }
-                if let Some(binds) = binds {
+                if let Some(binds) = rs_tosql.binds {
                     to_binds.extend(binds);
+                }
+                if let Some(select_binds) = rs_tosql.select_binds {
+                    to_select_binds.extend(select_binds);
+                }
+                if let Some(join_binds) = rs_tosql.join_binds {
+                    to_join_binds.extend(join_binds);
                 }
             }
             Statement::SubChain(qb) => {
@@ -86,10 +100,16 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 }
                 let mut c = c.clone();
                 c.query = *qb.clone();
-                let (sql, binds) = to_sql(&c, true);
-                statement_sql.push_str(&format!("({})", sql));
-                if let Some(binds) = binds {
+                let rs_tosql = to_sql(&c, true);
+                statement_sql.push_str(&format!("({})", rs_tosql.sql));
+                if let Some(binds) = rs_tosql.binds {
                     to_binds.extend(binds);
+                }
+                if let Some(select_binds) = rs_tosql.select_binds {
+                    to_select_binds.extend(select_binds);
+                }
+                if let Some(join_binds) = rs_tosql.join_binds {
+                    to_join_binds.extend(join_binds);
                 }
             }
             Statement::Raw((sql, binds)) => {
@@ -105,7 +125,12 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
     }
 
     if is_statement {
-        return (statement_sql, Some(to_binds));
+        return ToSql {
+            sql: statement_sql,
+            binds: Some(to_binds),
+            select_binds: Some(to_select_binds),
+            join_binds: Some(to_join_binds),
+        };
     }
 
     let mut to_sql_str = String::new();
@@ -130,14 +155,20 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
                 Select::Raw((sql, binds)) => {
                     to_sql_str.push_str(sql);
                     if let Some(binds) = binds {
-                        to_binds.extend(binds.clone());
+                        to_select_binds.extend(binds.clone());
                     }
                 }
                 Select::Builder(subc) => {
-                    let (sql, binds) = to_sql(subc, true);
-                    to_sql_str.push_str(&sql);
-                    if let Some(binds) = binds {
+                    let rs_tosql = to_sql(subc, true);
+                    to_sql_str.push_str(&rs_tosql.sql);
+                    if let Some(binds) = rs_tosql.binds {
                         to_binds.extend(binds.clone());
+                    }
+                    if let Some(select_binds) = rs_tosql.select_binds {
+                        to_select_binds.extend(select_binds);
+                    }
+                    if let Some(join_binds) = rs_tosql.join_binds {
+                        to_join_binds.extend(join_binds);
                     }
                 }
             }
@@ -158,7 +189,7 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
         let (sql, binds) = join_to_sql(c, true);
         to_sql_str.push_str(&format!(" {}", sql));
         if let Some(binds) = binds {
-            to_binds.extend(binds.clone());
+            to_join_binds.extend(binds.clone());
         }
     }
     if !statement_sql.is_empty() {
@@ -181,7 +212,13 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> (String, Option<Vec<serde
             }
         }
     }
-    (to_sql_str, Some(to_binds))
+    // (to_sql_str, Some(to_binds))
+    ToSql {
+        sql: to_sql_str,
+        binds: Some(to_binds),
+        select_binds: Some(to_select_binds),
+        join_binds: Some(to_join_binds),
+    }
 }
 
 fn join_to_sql(c: &ChainBuilder, prefix: bool) -> (String, Option<Vec<serde_json::Value>>) {

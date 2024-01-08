@@ -121,9 +121,21 @@ impl ChainBuilder {
     }
 
     fn delegate_to_sql(&self, is_statement: bool) -> (String, Option<Vec<serde_json::Value>>) {
-        match self.client {
+        let rs = match self.client {
             Client::Mysql => mysql::to_sql(self, is_statement),
+        };
+        let sql = rs.sql;
+        let mut rs_binds: Vec<serde_json::Value> = vec![];
+        if let Some(select_binds) = rs.select_binds {
+            rs_binds.extend(select_binds);
         }
+        if let Some(join_binds) = rs.join_binds {
+            rs_binds.extend(join_binds);
+        }
+        if let Some(binds) = rs.binds {
+            rs_binds.extend(binds);
+        }
+        (sql, Some(rs_binds))
     }
 
     pub fn to_sql(&self) -> (String, Option<Vec<serde_json::Value>>) {
