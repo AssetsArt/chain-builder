@@ -133,6 +133,10 @@ impl ChainBuilder {
     pub fn query(&mut self, mut query: impl FnMut(&mut QueryBuilder)) {
         query(&mut self.query);
     }
+
+    pub fn add_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) {
+        self.query.raw = Some(raw);
+    }
 }
 
 #[cfg(test)]
