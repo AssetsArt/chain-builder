@@ -227,10 +227,6 @@ mod tests {
         let mut builder = ChainBuilder::new(Client::Mysql);
         builder.db("mydb"); // For dynamic db
         builder.select(Select::Columns(vec!["*".into()]));
-        builder.select(Select::Raw((
-            "(SELECT COUNT(*) FROM mydb.users WHERE users.id = details.id) AS count".into(),
-            Some(vec![]),
-        )));
         builder.from("users");
         builder.query(|qb| {
             qb.join("details", |join| {
@@ -244,12 +240,25 @@ mod tests {
             });
             qb.where_eq("name", serde_json::Value::String("John".to_string()));
         });
+        builder.select(Select::Raw((
+            "(SELECT COUNT(*) FROM mydb.users WHERE users.id = ?) AS count".into(),
+            Some(vec![
+                serde_json::Value::Number(1.into()),
+            ]),
+        )));
         let sql = builder.to_sql();
         println!("final sql: {}", sql.0);
         println!("final binds: {:?}", sql.1);
         assert_eq!(
             sql.0,
-            "SELECT *, (SELECT COUNT(*) FROM mydb.users WHERE users.id = details.id) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
+            "SELECT *, (SELECT COUNT(*) FROM mydb.users WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
+        );
+        assert_eq!(
+            sql.1,
+            Some(vec![
+                serde_json::Value::Number(1.into()),
+                serde_json::Value::String("John".to_string()),
+            ])
         );
     }
 }
