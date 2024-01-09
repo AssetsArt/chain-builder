@@ -18,3 +18,4 @@ mysql = []
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sqlx = { version = "0.7", features = ["mysql"] }

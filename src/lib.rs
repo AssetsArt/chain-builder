@@ -143,6 +143,54 @@ impl ChainBuilder {
         self.delegate_to_sql(false)
     }
 
+    #[cfg(feature = "mysql")]
+    pub fn to_sqlx_query<'a>(&'a self, sql: &'a str, binds: Vec<serde_json::Value>) -> sqlx::query::Query<'_, sqlx::MySql, sqlx::mysql::MySqlArguments> {
+        let mut qb = sqlx::query::<sqlx::MySql>(sql);
+        for bind in binds {
+            match bind {
+                serde_json::Value::String(v) => {
+                    qb = qb.bind(v);
+                }
+                serde_json::Value::Number(v) => {
+                    if v.is_f64() {
+                        qb = qb.bind(v.as_f64().unwrap_or(0.0));
+                    } else if v.is_u64() {
+                        qb = qb.bind(v.as_u64().unwrap_or(0));
+                    } else if v.is_i64() {
+                        qb = qb.bind(v.as_i64().unwrap_or(0));
+                    }
+                }
+                _ => {}
+            }
+        }
+        qb
+    }
+
+    #[cfg(feature = "mysql")]
+    pub fn to_sqlx_query_as<'a, T>(&'a self, sql: &'a str, binds: Vec<serde_json::Value>) -> sqlx::query::QueryAs<'_, sqlx::MySql, T, sqlx::mysql::MySqlArguments> 
+        where T: for<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow>
+    {
+        let mut qb = sqlx::query_as::<_, T>(sql);
+        for bind in binds {
+            match bind {
+                serde_json::Value::String(v) => {
+                    qb = qb.bind(v);
+                }
+                serde_json::Value::Number(v) => {
+                    if v.is_f64() {
+                        qb = qb.bind(v.as_f64().unwrap_or(0.0));
+                    } else if v.is_u64() {
+                        qb = qb.bind(v.as_u64().unwrap_or(0));
+                    } else if v.is_i64() {
+                        qb = qb.bind(v.as_i64().unwrap_or(0));
+                    }
+                }
+                _ => {}
+            }
+        }
+        qb
+    }
+
     pub fn query(&mut self, mut query: impl FnMut(&mut QueryBuilder)) {
         query(&mut self.query);
     }
