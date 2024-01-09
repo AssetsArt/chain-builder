@@ -146,7 +146,7 @@ impl ChainBuilder {
 
     #[cfg(any(
         feature = "mysql",
-        feature = "sqlx",
+        feature = "sqlx/mysql",
     ))]
     pub fn to_sqlx_query<'a>(&'a self, sql: &'a str, binds: Vec<serde_json::Value>) -> sqlx::query::Query<'_, sqlx::MySql, sqlx::mysql::MySqlArguments> {
         let mut qb = sqlx::query::<sqlx::MySql>(sql);
@@ -174,7 +174,7 @@ impl ChainBuilder {
 
     #[cfg(any(
         feature = "mysql",
-        feature = "sqlx",
+        feature = "sqlx/mysql",
     ))]
     pub fn to_sqlx_query_as<'a, T>(&'a self, sql: &'a str, binds: Vec<serde_json::Value>) -> sqlx::query::QueryAs<'_, sqlx::MySql, T, sqlx::mysql::MySqlArguments> 
         where T: for<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow>
