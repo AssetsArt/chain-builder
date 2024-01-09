@@ -259,6 +259,13 @@ fn join_to_sql(c: &ChainBuilder, prefix: bool) -> (String, Option<Vec<serde_json
                     if let Some(binds) = binds {
                         to_binds.extend(binds);
                     }
+                },
+                JoinStatement::OnVal(column, operator, value) => {
+                    if j > 0 {
+                        to_sql_str.push_str(" AND ");
+                    }
+                    to_sql_str.push_str(format!("{} {} ?", column, operator).as_str());
+                    to_binds.push(value.clone());
                 }
             }
         }

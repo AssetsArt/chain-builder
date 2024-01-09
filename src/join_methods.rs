@@ -8,6 +8,7 @@ pub trait JoinMethods {
 pub trait JoinBuilderMethods {
     fn on(&mut self, column: &str, operator: &str, column2: &str) -> &mut Self;
     fn or(&mut self) -> &mut JoinBuilder;
+    fn on_val(&mut self, column: &str, operator: &str, value: serde_json::Value) -> &mut Self;
 }
 
 impl JoinBuilderMethods for JoinBuilder {
@@ -27,6 +28,16 @@ impl JoinBuilderMethods for JoinBuilder {
         // SAFETY: unwrap() is safe because we just pushed an OrChain
         self.statement.last_mut().unwrap().to_join_builder()
     }
+
+    fn on_val(&mut self, column: &str, operator: &str, value: serde_json::Value) -> &mut Self {
+        self.statement.push(JoinStatement::OnVal(
+            column.to_string(),
+            operator.to_string(),
+            value,
+        ));
+        self
+    }
+
 }
 
 impl JoinMethods for QueryBuilder {

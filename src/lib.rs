@@ -61,6 +61,7 @@ pub struct QueryBuilder {
 pub enum JoinStatement {
     On(String, String, String),
     OrChain(Box<JoinBuilder>),
+    OnVal(String, String, serde_json::Value),
 }
 
 impl JoinStatement {
