@@ -144,7 +144,10 @@ impl ChainBuilder {
         self.delegate_to_sql(false)
     }
 
-    #[cfg(feature = "mysql")]
+    #[cfg(any(
+        feature = "mysql",
+        feature = "sqlx",
+    ))]
     pub fn to_sqlx_query<'a>(&'a self, sql: &'a str, binds: Vec<serde_json::Value>) -> sqlx::query::Query<'_, sqlx::MySql, sqlx::mysql::MySqlArguments> {
         let mut qb = sqlx::query::<sqlx::MySql>(sql);
         for bind in binds {
@@ -159,6 +162,8 @@ impl ChainBuilder {
                         qb = qb.bind(v.as_u64().unwrap_or(0));
                     } else if v.is_i64() {
                         qb = qb.bind(v.as_i64().unwrap_or(0));
+                    } else {
+                        qb = qb.bind(v.to_string());
                     }
                 }
                 _ => {}
@@ -167,7 +172,10 @@ impl ChainBuilder {
         qb
     }
 
-    #[cfg(feature = "mysql")]
+    #[cfg(any(
+        feature = "mysql",
+        feature = "sqlx",
+    ))]
     pub fn to_sqlx_query_as<'a, T>(&'a self, sql: &'a str, binds: Vec<serde_json::Value>) -> sqlx::query::QueryAs<'_, sqlx::MySql, T, sqlx::mysql::MySqlArguments> 
         where T: for<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow>
     {
@@ -184,6 +192,8 @@ impl ChainBuilder {
                         qb = qb.bind(v.as_u64().unwrap_or(0));
                     } else if v.is_i64() {
                         qb = qb.bind(v.as_i64().unwrap_or(0));
+                    } else {
+                        qb = qb.bind(v.to_string());
                     }
                 }
                 _ => {}
