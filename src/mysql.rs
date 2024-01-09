@@ -162,15 +162,18 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> ToSql {
                     let rs_tosql = to_sql(&subc.1, false);
                     to_sql_str.push_str(&format!("({}) AS {}", rs_tosql.sql, subc.0));
 
-                    // Add all binds to select_binds
-                    if let Some(binds) = rs_tosql.binds {
-                        to_select_binds.extend(binds.clone());
-                    }
+                    // Add all binds to select_binds order by select_binds, join_binds, binds
                     if let Some(select_binds) = rs_tosql.select_binds {
+                        // 1. add select_binds
                         to_select_binds.extend(select_binds);
                     }
                     if let Some(join_binds) = rs_tosql.join_binds {
+                        // 2. add join_binds
                         to_select_binds.extend(join_binds);
+                    }
+                    if let Some(binds) = rs_tosql.binds {
+                        // 3. add binds
+                        to_select_binds.extend(binds.clone());
                     }
                 }
             }
