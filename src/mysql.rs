@@ -232,7 +232,9 @@ fn join_to_sql(c: &ChainBuilder, prefix: bool) -> (String, Option<Vec<serde_json
     for (i, join) in c.query.join.iter().enumerate() {
         if i > 0 {
             to_sql_str.push(' ');
-        } else if prefix {
+        }
+        
+        if prefix {
             let table = if let Some(db) = &c.db {
                 format!("{}.{}", db, join.table)
             } else {
@@ -240,6 +242,7 @@ fn join_to_sql(c: &ChainBuilder, prefix: bool) -> (String, Option<Vec<serde_json
             };
             to_sql_str.push_str(&format!("{} {} ON ", join.join_type, table));
         }
+        
         for (j, statement) in join.statement.iter().enumerate() {
             match statement {
                 JoinStatement::On(column, operator, column2) => {
