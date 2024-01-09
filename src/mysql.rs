@@ -159,16 +159,18 @@ pub fn to_sql(c: &ChainBuilder, is_statement: bool) -> ToSql {
                     }
                 }
                 Select::Builder(subc) => {
-                    let rs_tosql = to_sql(subc, true);
-                    to_sql_str.push_str(&rs_tosql.sql);
+                    let rs_tosql = to_sql(&subc.1, false);
+                    to_sql_str.push_str(&format!("({}) AS {}", rs_tosql.sql, subc.0));
+
+                    // Add all binds to select_binds
                     if let Some(binds) = rs_tosql.binds {
-                        to_binds.extend(binds.clone());
+                        to_select_binds.extend(binds.clone());
                     }
                     if let Some(select_binds) = rs_tosql.select_binds {
                         to_select_binds.extend(select_binds);
                     }
                     if let Some(join_binds) = rs_tosql.join_binds {
-                        to_join_binds.extend(join_binds);
+                        to_select_binds.extend(join_binds);
                     }
                 }
             }

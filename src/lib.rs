@@ -83,7 +83,8 @@ pub struct JoinBuilder {
 pub enum Select {
     Columns(Vec<String>),
     Raw((String, Option<Vec<serde_json::Value>>)),
-    Builder(Box<ChainBuilder>),
+    // column name, builder
+    Builder((String, ChainBuilder)),
 }
 
 impl ChainBuilder {
