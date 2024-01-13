@@ -1,4 +1,5 @@
-use crate::{operator::Operator, ChainBuilder, JoinStatement, Method, Select, Statement};
+use crate::join::JoinStatement;
+use crate::{operator::Operator, ChainBuilder, Method, Select, Statement};
 
 // operator and is_bind
 pub fn operator_to_sql(operator: &Operator) -> (&str, bool) {

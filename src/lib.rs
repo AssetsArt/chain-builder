@@ -1,12 +1,17 @@
-// mod mysql;
-mod join_methods;
+// pub mod
+pub mod join;
+
 #[cfg(feature = "mysql")]
 mod mysql;
+
+// mods
 mod operator;
 mod where_clauses;
 
+// internal use
+use join::JoinBuilder;
+
 // export
-pub use join_methods::{JoinBuilderMethods, JoinMethods};
 pub use operator::Operator;
 pub use where_clauses::WhereClauses;
 
@@ -55,29 +60,6 @@ pub struct QueryBuilder {
     statement: Vec<Statement>,
     raw: Vec<(String, Option<Vec<serde_json::Value>>)>,
     join: Vec<JoinBuilder>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum JoinStatement {
-    On(String, String, String),
-    OrChain(Box<JoinBuilder>),
-    OnVal(String, String, serde_json::Value),
-}
-
-impl JoinStatement {
-    pub fn to_join_builder(&mut self) -> &mut JoinBuilder {
-        match self {
-            JoinStatement::OrChain(query) => query,
-            _ => panic!("JoinStatement::to_join_builder()"),
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
-pub struct JoinBuilder {
-    table: String,
-    join_type: String,
-    statement: Vec<JoinStatement>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -211,115 +193,5 @@ impl ChainBuilder {
 
     pub fn add_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) {
         self.query.raw.push(raw);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{ChainBuilder, Client, JoinBuilderMethods, JoinMethods, Select, WhereClauses};
-
-    #[test]
-    fn test_chain_builder() {
-        let mut builder = ChainBuilder::new(Client::Mysql);
-        builder.db("mydb"); // For dynamic db
-        builder.select(Select::Columns(vec!["*".into()]));
-        builder.from("users");
-        builder.query(|qb| {
-            qb.where_eq("name", serde_json::Value::String("John".to_string()));
-            qb.where_eq("city", serde_json::Value::String("New York".to_string()));
-            qb.where_in(
-                "department",
-                vec![
-                    serde_json::Value::String("IT".to_string()),
-                    serde_json::Value::String("HR".to_string()),
-                ],
-            );
-
-            qb.where_subquery(|sub| {
-                sub.where_eq("status", serde_json::Value::String("active".to_string()));
-                sub.or()
-                    .where_eq("status", serde_json::Value::String("pending".to_string()))
-                    .where_between(
-                        "registered_at",
-                        [
-                            serde_json::Value::String("2024-01-01".to_string()),
-                            serde_json::Value::String("2024-01-31".to_string()),
-                        ],
-                    );
-            });
-
-            qb.where_raw((
-                "(latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)".into(),
-                Some(vec![
-                    serde_json::Value::Number(serde_json::Number::from_f64(40.0).unwrap()),
-                    serde_json::Value::Number(serde_json::Number::from_f64(41.0).unwrap()),
-                    serde_json::Value::Number(serde_json::Number::from_f64(70.0).unwrap()),
-                    serde_json::Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
-                ]),
-            ));
-        });
-
-        let sql = builder.to_sql();
-        // println!("final sql: {}", sql.0);
-        // println!("final binds: {:?}", sql.1);
-        assert_eq!(
-            sql.0,
-            "SELECT * FROM mydb.users WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)"
-        );
-        assert_eq!(
-            sql.1,
-            Some(vec![
-                serde_json::Value::String("John".to_string()),
-                serde_json::Value::String("New York".to_string()),
-                serde_json::Value::String("IT".to_string()),
-                serde_json::Value::String("HR".to_string()),
-                serde_json::Value::String("active".to_string()),
-                serde_json::Value::String("pending".to_string()),
-                serde_json::Value::String("2024-01-01".to_string()),
-                serde_json::Value::String("2024-01-31".to_string()),
-                serde_json::Value::Number(serde_json::Number::from_f64(40.0).unwrap()),
-                serde_json::Value::Number(serde_json::Number::from_f64(41.0).unwrap()),
-                serde_json::Value::Number(serde_json::Number::from_f64(70.0).unwrap()),
-                serde_json::Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
-            ])
-        );
-    }
-
-    #[test]
-    fn test_join() {
-        let mut builder = ChainBuilder::new(Client::Mysql);
-        builder.db("mydb"); // For dynamic db
-        builder.select(Select::Columns(vec!["*".into()]));
-        builder.from("users");
-        builder.query(|qb| {
-            qb.join("details", |join| {
-                join.on("details.id", "=", "users.d_id");
-                join.on("details.id_w", "=", "users.d_id_w");
-                join.or().on("details.id_s", "=", "users.d_id_s").on(
-                    "details.id_w",
-                    "=",
-                    "users.d_id_w",
-                );
-            });
-            qb.where_eq("name", serde_json::Value::String("John".to_string()));
-        });
-        builder.select(Select::Raw((
-            "(SELECT COUNT(*) FROM mydb.users WHERE users.id = ?) AS count".into(),
-            Some(vec![serde_json::Value::Number(1.into())]),
-        )));
-        let sql = builder.to_sql();
-        println!("final sql: {}", sql.0);
-        println!("final binds: {:?}", sql.1);
-        assert_eq!(
-            sql.0,
-            "SELECT *, (SELECT COUNT(*) FROM mydb.users WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
-        );
-        assert_eq!(
-            sql.1,
-            Some(vec![
-                serde_json::Value::Number(1.into()),
-                serde_json::Value::String("John".to_string()),
-            ])
-        );
     }
 }

@@ -19,3 +19,8 @@ mysql = []
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.7" }
+
+
+[[test]]
+name = "mysql_test"
+path = "tests/mysql_test.rs"
