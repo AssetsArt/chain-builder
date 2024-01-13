@@ -10,17 +10,24 @@ categories = ["database", "mysql", "query", "builder", "rust"]
 repository = "https://github.com/Aitthi/chain-builder.git"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[features]
-default = ["mysql", "sqlx/mysql"]
-mysql = []
-
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.7" }
 
+[dev-dependencies]
+chain-builder = { path = ".", default-features = false, features = ["dev-dependencies"] }
+
+[features]
+default = ["mysql", "sqlx_mysql"]
+full = ["mysql", "sqlx_mysql"]
+sqlx_mysql = ["sqlx/mysql"]
+mysql = []
+postgres = []
+dev-dependencies = ["full"]
+
 
 [[test]]
 name = "mysql_test"
 path = "tests/mysql_test.rs"
+required-features = ["mysql"]

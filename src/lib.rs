@@ -1,23 +1,21 @@
-// pub mod
-pub mod join;
-
 #[cfg(feature = "mysql")]
 mod mysql;
-
 // mods
 mod operator;
 mod where_clauses;
-
+mod join;
 // internal use
 use join::JoinBuilder;
 
 // export
 pub use operator::Operator;
 pub use where_clauses::WhereClauses;
+pub use join::JoinMethods;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Client {
     Mysql,
+    Postgres,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -105,28 +103,41 @@ impl ChainBuilder {
     }
 
     fn delegate_to_sql(&self, is_statement: bool) -> (String, Option<Vec<serde_json::Value>>) {
-        let rs = match self.client {
-            Client::Mysql => mysql::to_sql(self, is_statement),
-        };
-        let sql = rs.sql;
-        let mut rs_binds: Vec<serde_json::Value> = vec![];
-        if let Some(select_binds) = rs.select_binds {
-            rs_binds.extend(select_binds);
+        match self.client {
+            #[cfg(feature = "mysql")]
+            Client::Mysql => {
+                let rs = mysql::to_sql(self, is_statement);
+                let sql = rs.sql;
+                let mut rs_binds: Vec<serde_json::Value> = vec![];
+                if let Some(select_binds) = rs.select_binds {
+                    rs_binds.extend(select_binds);
+                }
+                if let Some(join_binds) = rs.join_binds {
+                    rs_binds.extend(join_binds);
+                }
+                if let Some(binds) = rs.binds {
+                    rs_binds.extend(binds);
+                }
+                (sql, Some(rs_binds))
+            },
+            #[cfg(feature = "postgres")]
+            Client::Postgres => {
+                panic!("not support client");
+            },
+            _ => {
+                panic!("not support client");
+            }
         }
-        if let Some(join_binds) = rs.join_binds {
-            rs_binds.extend(join_binds);
-        }
-        if let Some(binds) = rs.binds {
-            rs_binds.extend(binds);
-        }
-        (sql, Some(rs_binds))
     }
 
     pub fn to_sql(&self) -> (String, Option<Vec<serde_json::Value>>) {
         self.delegate_to_sql(false)
     }
 
-    #[cfg(any(feature = "mysql", feature = "sqlx/mysql",))]
+    #[cfg(all(
+        feature = "mysql",
+        feature = "sqlx_mysql"
+    ))]
     pub fn to_sqlx_query<'a>(
         &'a self,
         sql: &'a str,
@@ -155,7 +166,10 @@ impl ChainBuilder {
         qb
     }
 
-    #[cfg(any(feature = "mysql", feature = "sqlx/mysql",))]
+    #[cfg(all(
+        feature = "mysql",
+        feature = "sqlx_mysql"
+    ))]
     pub fn to_sqlx_query_as<'a, T>(
         &'a self,
         sql: &'a str,

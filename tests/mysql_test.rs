@@ -1,4 +1,4 @@
-use chain_builder::{join::JoinMethods, ChainBuilder, Client, Select, WhereClauses};
+use chain_builder::{ChainBuilder, Client, JoinMethods, Select, WhereClauses};
 
 #[test]
 fn test_chain_builder() {
