@@ -37,7 +37,6 @@ impl JoinBuilderMethods for JoinBuilder {
         ));
         self
     }
-
 }
 
 impl JoinMethods for QueryBuilder {
