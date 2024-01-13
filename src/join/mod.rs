@@ -11,7 +11,7 @@ pub(crate) enum JoinStatement {
 }
 
 impl JoinStatement {
-    pub fn to_join_builder(&mut self) -> &mut JoinBuilder {
+    pub fn as_mut_join_builder(&mut self) -> &mut JoinBuilder {
         match self {
             JoinStatement::OrChain(query) => query,
             _ => panic!("JoinStatement::to_join_builder()"),

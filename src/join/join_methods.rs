@@ -43,7 +43,7 @@ impl JoinBuilder {
         chain.statement = vec![];
         self.statement.push(JoinStatement::OrChain(Box::new(chain)));
         // SAFETY: unwrap() is safe because we just pushed an OrChain
-        self.statement.last_mut().unwrap().to_join_builder()
+        self.statement.last_mut().unwrap().as_mut_join_builder()
     }
 
     pub fn on_val(&mut self, column: &str, operator: &str, value: serde_json::Value) -> &mut Self {
