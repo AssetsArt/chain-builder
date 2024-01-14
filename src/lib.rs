@@ -4,13 +4,11 @@ mod mysql;
 mod operator;
 mod where_clauses;
 mod join;
-// internal use
-use join::JoinBuilder;
 
 // export
 pub use operator::Operator;
 pub use where_clauses::WhereClauses;
-pub use join::JoinMethods;
+pub use join::{JoinMethods, JoinBuilder};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Client {
