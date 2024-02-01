@@ -24,29 +24,29 @@ fn insert_into_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     let map_default = serde_json::Map::new();
     let data = chain_builder.inner.as_object().unwrap_or(&map_default);
     let mut keys = data.keys().collect::<Vec<&String>>();
-    keys.sort_by(|a, b| a.cmp(b));
+    keys.sort();
     let len = keys.len();
-    for x in 0..len {
+    for key in keys.iter().take(len) {
         if is_first {
             is_first = false;
         } else {
             insert_sql.push_str(", ");
         }
-        insert_sql.push_str(keys[x]);
+        insert_sql.push_str(key.as_str());
     }
     insert_sql.push_str(") VALUES (");
     is_first = true;
-    for x in 0..len {
+    for key in keys.iter().take(len) {
         if is_first {
             is_first = false;
         } else {
             insert_sql.push_str(", ");
         }
-        insert_sql.push_str("?");
-        insert_binds.push(data.get(keys[x].as_str()).unwrap().clone());
+        insert_sql.push('?');
+        insert_binds.push(data.get(key.as_str()).unwrap().clone());
     }
 
-    insert_sql.push_str(")");
+    insert_sql.push(')');
 
     (insert_sql, insert_binds)
 }
