@@ -8,6 +8,7 @@ mod where_clauses;
 // export
 pub use join::{JoinBuilder, JoinMethods};
 pub use operator::Operator;
+use serde_json::Value;
 pub use where_clauses::WhereClauses;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -49,6 +50,7 @@ pub struct ChainBuilder {
     select: Vec<Select>,
     query: QueryBuilder,
     method: Method,
+    inner: Value,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -76,6 +78,7 @@ impl ChainBuilder {
             db: None,
             query: QueryBuilder::default(),
             method: Method::Select,
+            inner: Value::Null,
         }
     }
 
@@ -92,6 +95,12 @@ impl ChainBuilder {
     pub fn select(&mut self, select: Select) -> &mut ChainBuilder {
         self.method = Method::Select;
         self.select.push(select);
+        self
+    }
+
+    pub fn insert(&mut self, data: Value) -> &mut ChainBuilder {
+        self.method = Method::Insert;
+        self.inner = data;
         self
     }
 
@@ -117,10 +126,15 @@ impl ChainBuilder {
                     sql.push(' ');
                     sql.push_str(rs.statement.0.as_str());
                 }
+                if !rs.raw.0.is_empty() {
+                    sql.push(' ');
+                    sql.push_str(rs.raw.0.as_str());
+                }
                 let mut rs_binds: Vec<serde_json::Value> = vec![];
                 rs_binds.extend(rs.method.1);
                 rs_binds.extend(rs.join.1);
                 rs_binds.extend(rs.statement.1);
+                rs_binds.extend(rs.raw.1);
                 (sql, rs_binds)
             }
             #[cfg(feature = "postgres")]

@@ -42,12 +42,14 @@ fn test_chain_builder() {
         );
     });
 
+    builder.add_raw("LIMIT ?".into(), Some(vec![10.into()]));
+
     let sql = builder.to_sql();
     // println!("final sql: {}", sql.0);
     // println!("final binds: {:?}", sql.1);
     assert_eq!(
             sql.0,
-            "SELECT * FROM `mydb`.`users` WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)"
+            "SELECT * FROM `mydb`.`users` WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?) LIMIT ?"
         );
     assert_eq!(
         sql.1,
@@ -64,6 +66,7 @@ fn test_chain_builder() {
             Value::Number(serde_json::Number::from_f64(41.0).unwrap()),
             Value::Number(serde_json::Number::from_f64(70.0).unwrap()),
             Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
+            Value::Number(10.into()),
         ]
     );
 }
@@ -102,6 +105,34 @@ fn test_join() {
         vec![
             serde_json::Value::Number(1.into()),
             serde_json::Value::String("John".to_string()),
+        ]
+    );
+}
+
+
+#[test]
+fn test_insert() {
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder.db("mydb"); // For dynamic db
+    builder.table("users");
+    builder.insert(serde_json::json!({
+        "name": "John",
+        "`city`": "New York",
+        "department": "IT",
+    }));
+    let sql = builder.to_sql();
+    println!("final sql: {}", sql.0);
+    println!("final binds: {:?}", sql.1);
+    assert_eq!(
+            sql.0,
+            "INSERT INTO `mydb`.`users` (`city`, department, name) VALUES (?, ?, ?)"
+        );
+    assert_eq!(
+        sql.1,
+        vec![
+            serde_json::Value::String("New York".to_string()),
+            serde_json::Value::String("IT".to_string()),
+            serde_json::Value::String("John".to_string())
         ]
     );
 }

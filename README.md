@@ -14,41 +14,42 @@ cargo add chain-builder
 ## Usage
 ```rust
 use chain_builder::{ChainBuilder, Select, WhereClauses, Client};
+use serde_json::{self, Value};
 let mut builder = ChainBuilder::new(Client::Mysql);
 builder.db("mydb"); // For dynamic db
 builder.select(Select::Columns(vec!["*".into()]));
-builder.from("users");
+builder.table("users");
 builder.query(|qb| {
-    qb.where_eq("name", serde_json::Value::String("John".to_string()));
-    qb.where_eq("city", serde_json::Value::String("New York".to_string()));
+    qb.where_eq("name", Value::String("John".to_string()));
+    qb.where_eq("city", Value::String("New York".to_string()));
     qb.where_in(
         "department",
         vec![
-            serde_json::Value::String("IT".to_string()),
-            serde_json::Value::String("HR".to_string()),
+            Value::String("IT".to_string()),
+            Value::String("HR".to_string()),
         ],
     );
     qb.where_subquery(|sub| {
-        sub.where_eq("status", serde_json::Value::String("active".to_string()));
+        sub.where_eq("status", Value::String("active".to_string()));
         sub.or()
-            .where_eq("status", serde_json::Value::String("pending".to_string()))
+            .where_eq("status", Value::String("pending".to_string()))
             .where_between(
                 "registered_at",
                 [
-                    serde_json::Value::String("2024-01-01".to_string()),
-                    serde_json::Value::String("2024-01-31".to_string()),
+                    Value::String("2024-01-01".to_string()),
+                    Value::String("2024-01-31".to_string()),
                 ],
             );
     });
-    qb.where_raw((
+    qb.where_raw(
         "(latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?)".into(),
         Some(vec![
-            serde_json::Value::Number(serde_json::Number::from_f64(40.0).unwrap()),
-            serde_json::Value::Number(serde_json::Number::from_f64(41.0).unwrap()),
-            serde_json::Value::Number(serde_json::Number::from_f64(70.0).unwrap()),
-            serde_json::Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
+            Value::Number(serde_json::Number::from_f64(40.0).unwrap()),
+            Value::Number(serde_json::Number::from_f64(41.0).unwrap()),
+            Value::Number(serde_json::Number::from_f64(70.0).unwrap()),
+            Value::Number(serde_json::Number::from_f64(71.0).unwrap()),
         ]),
-    ));
+    );
 });
 let sql = builder.to_sql();
 println!("final sql: {}", sql.0);

@@ -18,6 +18,7 @@ pub struct ToSql {
     pub statement: (String, Vec<Value>),
     pub method: (String, Vec<Value>),
     pub join: (String, Vec<Value>),
+    pub raw: (String, Vec<Value>),
 }
 
 pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
@@ -31,9 +32,22 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     // join compiler
     let join = join_compiler(chain_builder, true);
 
+    // raw compiler
+    let mut raw_sql = String::new();
+    let mut raw_binds: Vec<serde_json::Value> = vec![];
+    if !chain_builder.query.raw.is_empty() {
+        for raw in &chain_builder.query.raw {
+            raw_sql.push_str(&raw.0);
+            if let Some(binds) = &raw.1 {
+                raw_binds.extend(binds.clone());
+            }
+        }
+    }
+
     ToSql {
         statement,
         method,
         join,
+        raw: (raw_sql, raw_binds),
     }
 }
