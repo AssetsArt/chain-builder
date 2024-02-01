@@ -5,7 +5,7 @@ use serde_json::Value;
 pub fn method_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     match chain_builder.method {
         Method::Select => select_compiler(chain_builder),
-        Method::Insert => insert_into_compiler(chain_builder)
+        Method::Insert => insert_into_compiler(chain_builder),
     }
 }
 

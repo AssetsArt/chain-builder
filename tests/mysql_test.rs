@@ -109,7 +109,6 @@ fn test_join() {
     );
 }
 
-
 #[test]
 fn test_insert() {
     let mut builder = ChainBuilder::new(Client::Mysql);
@@ -124,9 +123,9 @@ fn test_insert() {
     println!("final sql: {}", sql.0);
     println!("final binds: {:?}", sql.1);
     assert_eq!(
-            sql.0,
-            "INSERT INTO `mydb`.`users` (`city`, department, name) VALUES (?, ?, ?)"
-        );
+        sql.0,
+        "INSERT INTO `mydb`.`users` (`city`, department, name) VALUES (?, ?, ?)"
+    );
     assert_eq!(
         sql.1,
         vec![
