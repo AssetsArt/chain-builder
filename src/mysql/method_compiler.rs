@@ -38,13 +38,13 @@ fn select_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
                     }
                 }
                 Select::Builder(as_name, c2) => {
-                    let rs_tosql = to_sql(&c2);
-                    select_sql.push_str("(");
+                    let rs_tosql = to_sql(c2);
+                    select_sql.push('(');
                     if !rs_tosql.method.0.is_empty() {
                         select_sql.push_str(rs_tosql.method.0.as_str());
                     }
                     if !rs_tosql.statement.0.is_empty() {
-                        select_sql.push_str(" ");
+                        select_sql.push(' ');
                         select_sql.push_str(rs_tosql.statement.0.as_str());
                     }
                     select_sql.push_str(") AS ");

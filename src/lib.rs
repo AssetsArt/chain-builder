@@ -110,11 +110,11 @@ impl ChainBuilder {
                     sql.push_str(rs.method.0.as_str());
                 }
                 if !rs.join.0.is_empty() {
-                    sql.push_str(" ");
+                    sql.push(' ');
                     sql.push_str(rs.join.0.as_str());
                 }
                 if !rs.statement.0.is_empty() {
-                    sql.push_str(" ");
+                    sql.push(' ');
                     sql.push_str(rs.statement.0.as_str());
                 }
                 let mut rs_binds: Vec<serde_json::Value> = vec![];
