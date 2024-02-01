@@ -8,25 +8,25 @@ fn test_chain_builder() {
     builder.select(Select::Columns(vec!["*".into()]));
     builder.table("users");
     builder.query(|qb| {
-        qb.where_eq("name", serde_json::Value::String("John".to_string()));
-        qb.where_eq("city", serde_json::Value::String("New York".to_string()));
+        qb.where_eq("name", Value::String("John".to_string()));
+        qb.where_eq("city", Value::String("New York".to_string()));
         qb.where_in(
             "department",
             vec![
-                serde_json::Value::String("IT".to_string()),
-                serde_json::Value::String("HR".to_string()),
+                Value::String("IT".to_string()),
+                Value::String("HR".to_string()),
             ],
         );
 
         qb.where_subquery(|sub| {
-            sub.where_eq("status", serde_json::Value::String("active".to_string()));
+            sub.where_eq("status", Value::String("active".to_string()));
             sub.or()
-                .where_eq("status", serde_json::Value::String("pending".to_string()))
+                .where_eq("status", Value::String("pending".to_string()))
                 .where_between(
                     "registered_at",
                     [
-                        serde_json::Value::String("2024-01-01".to_string()),
-                        serde_json::Value::String("2024-01-31".to_string()),
+                        Value::String("2024-01-01".to_string()),
+                        Value::String("2024-01-31".to_string()),
                     ],
                 );
         });
@@ -87,11 +87,11 @@ fn test_join() {
                 "users.d_id_w",
             );
         });
-        qb.where_eq("name", serde_json::Value::String("John".to_string()));
+        qb.where_eq("name", Value::String("John".to_string()));
     });
     builder.select(Select::Raw(
         "(SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count".into(),
-        Some(vec![serde_json::Value::Number(1.into())]),
+        Some(vec![Value::Number(1.into())]),
     ));
     let sql = builder.to_sql();
     // println!("final sql: {}", sql.0);
@@ -102,10 +102,7 @@ fn test_join() {
         );
     assert_eq!(
         sql.1,
-        vec![
-            serde_json::Value::Number(1.into()),
-            serde_json::Value::String("John".to_string()),
-        ]
+        vec![Value::Number(1.into()), Value::String("John".to_string()),]
     );
 }
 
@@ -129,9 +126,9 @@ fn test_insert() {
     assert_eq!(
         sql.1,
         vec![
-            serde_json::Value::String("New York".to_string()),
-            serde_json::Value::String("IT".to_string()),
-            serde_json::Value::String("John".to_string())
+            Value::String("New York".to_string()),
+            Value::String("IT".to_string()),
+            Value::String("John".to_string())
         ]
     );
 }
