@@ -19,7 +19,7 @@ pub trait WhereClauses {
     fn where_not_between(&mut self, column: &str, value: [serde_json::Value; 2]) -> &mut Self;
     fn where_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
     fn where_not_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
-    fn where_subquery(&mut self, value: impl FnMut(&mut QueryBuilder));
+    fn where_subquery(&mut self, value: impl FnOnce(&mut QueryBuilder));
     fn or(&mut self) -> &mut QueryBuilder;
     fn where_raw(&mut self, sql: &str, val: Option<Vec<serde_json::Value>>) -> &mut Self;
 }
@@ -36,7 +36,7 @@ impl WhereClauses for QueryBuilder {
         self
     }
 
-    fn where_subquery(&mut self, mut value: impl FnMut(&mut QueryBuilder)) {
+    fn where_subquery(&mut self, value: impl FnOnce(&mut QueryBuilder)) {
         let mut query = self.clone();
         query.statement = vec![];
         query.raw = vec![];

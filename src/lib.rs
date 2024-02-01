@@ -208,7 +208,7 @@ impl ChainBuilder {
         qb
     }
 
-    pub fn query(&mut self, mut query: impl FnMut(&mut QueryBuilder)) {
+    pub fn query(&mut self, query: impl FnOnce(&mut QueryBuilder)) {
         query(&mut self.query);
     }
 
