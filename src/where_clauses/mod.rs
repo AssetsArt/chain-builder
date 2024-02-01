@@ -21,7 +21,7 @@ pub trait WhereClauses {
     fn where_not_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
     fn where_subquery(&mut self, value: impl FnMut(&mut QueryBuilder));
     fn or(&mut self) -> &mut QueryBuilder;
-    fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self;
+    fn where_raw(&mut self, sql: &str, val: Option<Vec<serde_json::Value>>) -> &mut Self;
 }
 
 impl WhereClauses for QueryBuilder {
@@ -53,8 +53,8 @@ impl WhereClauses for QueryBuilder {
         self.statement.last_mut().unwrap().to_query_builder()
     }
 
-    fn where_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) -> &mut Self {
-        self.statement.push(Statement::Raw(raw));
+    fn where_raw(&mut self, sql: &str, val: Option<Vec<serde_json::Value>>) -> &mut Self {
+        self.statement.push(Statement::Raw((sql.to_string(), val)));
         self
     }
 

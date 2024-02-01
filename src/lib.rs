@@ -1,14 +1,14 @@
 #[cfg(feature = "mysql")]
 mod mysql;
 // mods
+mod join;
 mod operator;
 mod where_clauses;
-mod join;
 
 // export
+pub use join::{JoinBuilder, JoinMethods};
 pub use operator::Operator;
 pub use where_clauses::WhereClauses;
-pub use join::{JoinMethods, JoinBuilder};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Client {
@@ -37,7 +37,7 @@ impl Statement {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum Method {
     Select,
-    None,
+    Insert,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -61,9 +61,9 @@ pub struct QueryBuilder {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Select {
     Columns(Vec<String>),
-    Raw((String, Option<Vec<serde_json::Value>>)),
+    Raw(String, Option<Vec<serde_json::Value>>),
     // column name, builder
-    Builder((String, ChainBuilder)),
+    Builder(String, ChainBuilder),
 }
 
 impl ChainBuilder {
@@ -75,7 +75,7 @@ impl ChainBuilder {
             as_name: None,
             db: None,
             query: QueryBuilder::default(),
-            method: Method::None,
+            method: Method::Select,
         }
     }
 
@@ -84,7 +84,7 @@ impl ChainBuilder {
         self
     }
 
-    pub fn from(&mut self, table: &str) -> &mut ChainBuilder {
+    pub fn table(&mut self, table: &str) -> &mut ChainBuilder {
         self.table = table.to_string();
         self
     }
@@ -100,42 +100,40 @@ impl ChainBuilder {
         self
     }
 
-    fn delegate_to_sql(&self, is_statement: bool) -> (String, Option<Vec<serde_json::Value>>) {
+    pub fn to_sql(&self) -> (String, Vec<serde_json::Value>) {
         match self.client {
             #[cfg(feature = "mysql")]
             Client::Mysql => {
-                let rs = mysql::to_sql(self, is_statement);
-                let sql = rs.sql;
+                let rs = mysql::to_sql(self);
+                let mut sql: String = String::new();
+                if !rs.method.0.is_empty() {
+                    sql.push_str(rs.method.0.as_str());
+                }
+                if !rs.join.0.is_empty() {
+                    sql.push_str(" ");
+                    sql.push_str(rs.join.0.as_str());
+                }
+                if !rs.statement.0.is_empty() {
+                    sql.push_str(" ");
+                    sql.push_str(rs.statement.0.as_str());
+                }
                 let mut rs_binds: Vec<serde_json::Value> = vec![];
-                if let Some(select_binds) = rs.select_binds {
-                    rs_binds.extend(select_binds);
-                }
-                if let Some(join_binds) = rs.join_binds {
-                    rs_binds.extend(join_binds);
-                }
-                if let Some(binds) = rs.binds {
-                    rs_binds.extend(binds);
-                }
-                (sql, Some(rs_binds))
-            },
+                rs_binds.extend(rs.method.1);
+                rs_binds.extend(rs.join.1);
+                rs_binds.extend(rs.statement.1);
+                (sql, rs_binds)
+            }
             #[cfg(feature = "postgres")]
             Client::Postgres => {
                 panic!("not support client");
-            },
+            }
             _ => {
                 panic!("not support client");
             }
         }
     }
 
-    pub fn to_sql(&self) -> (String, Option<Vec<serde_json::Value>>) {
-        self.delegate_to_sql(false)
-    }
-
-    #[cfg(all(
-        feature = "mysql",
-        feature = "sqlx_mysql"
-    ))]
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub fn to_sqlx_query<'a>(
         &'a self,
         sql: &'a str,
@@ -164,10 +162,7 @@ impl ChainBuilder {
         qb
     }
 
-    #[cfg(all(
-        feature = "mysql",
-        feature = "sqlx_mysql"
-    ))]
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub fn to_sqlx_query_as<'a, T>(
         &'a self,
         sql: &'a str,
@@ -203,7 +198,7 @@ impl ChainBuilder {
         query(&mut self.query);
     }
 
-    pub fn add_raw(&mut self, raw: (String, Option<Vec<serde_json::Value>>)) {
-        self.query.raw.push(raw);
+    pub fn add_raw(&mut self, sql: &str, val: Option<Vec<serde_json::Value>>) {
+        self.query.raw.push((sql.to_string(), val));
     }
 }
