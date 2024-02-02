@@ -36,7 +36,10 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     let mut raw_sql = String::new();
     let mut raw_binds: Vec<serde_json::Value> = vec![];
     if !chain_builder.query.raw.is_empty() {
-        for raw in &chain_builder.query.raw {
+        for (i, raw) in chain_builder.query.raw.iter().enumerate() {
+            if i > 0 {
+                raw_sql.push(' ');
+            }
             raw_sql.push_str(&raw.0);
             if let Some(binds) = &raw.1 {
                 raw_binds.extend(binds.clone());
