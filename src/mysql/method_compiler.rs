@@ -116,5 +116,9 @@ fn select_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
         select_sql.push_str(format!("{}.", db).as_str());
     }
     select_sql.push_str(chain_builder.table.as_str());
+    if let Some(as_name) = &chain_builder.as_name {
+        select_sql.push_str(" AS ");
+        select_sql.push_str(as_name);
+    }
     (select_sql, select_binds)
 }
