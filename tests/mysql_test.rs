@@ -49,7 +49,7 @@ fn test_chain_builder() {
     // println!("final binds: {:?}", sql.1);
     assert_eq!(
             sql.0,
-            "SELECT * FROM `mydb`.`users` WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?) LIMIT ?"
+            "SELECT * FROM mydb.users WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?) LIMIT ?"
         );
     assert_eq!(
         sql.1,
@@ -98,7 +98,7 @@ fn test_join() {
     // println!("final binds: {:?}", sql.1);
     assert_eq!(
             sql.0,
-            "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM `mydb`.`users` JOIN `mydb`.`details` ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
+            "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
         );
     assert_eq!(
         sql.1,
@@ -121,7 +121,7 @@ fn test_insert() {
     println!("final binds: {:?}", sql.1);
     assert_eq!(
         sql.0,
-        "INSERT INTO `mydb`.`users` (`city`, department, name) VALUES (?, ?, ?)"
+        "INSERT INTO mydb.users (`city`, department, name) VALUES (?, ?, ?)"
     );
     assert_eq!(
         sql.1,

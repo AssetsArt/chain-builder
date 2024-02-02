@@ -10,7 +10,7 @@ pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec
         }
         if prefix {
             let table = if let Some(db) = &chain_builder.db {
-                format!("`{}`.`{}`", db, join.table)
+                format!("{}.{}", db, join.table)
             } else {
                 join.table.clone()
             };

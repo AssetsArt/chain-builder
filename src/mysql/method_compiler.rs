@@ -15,9 +15,9 @@ fn insert_into_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
 
     insert_sql.push_str("INSERT INTO ");
     if let Some(db) = &chain_builder.db {
-        insert_sql.push_str(format!("`{}`.", db).as_str());
+        insert_sql.push_str(format!("{}.", db).as_str());
     }
-    insert_sql.push_str(format!("`{}`", chain_builder.table).as_str());
+    insert_sql.push_str(chain_builder.table.as_str());
 
     insert_sql.push_str(" (");
     let mut is_first = true;
@@ -113,8 +113,8 @@ fn select_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
 
     select_sql.push_str(" FROM ");
     if let Some(db) = &chain_builder.db {
-        select_sql.push_str(format!("`{}`.", db).as_str());
+        select_sql.push_str(format!("{}.", db).as_str());
     }
-    select_sql.push_str(format!("`{}`", chain_builder.table).as_str());
+    select_sql.push_str(chain_builder.table.as_str());
     (select_sql, select_binds)
 }
