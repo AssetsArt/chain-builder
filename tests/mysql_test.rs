@@ -316,3 +316,75 @@ fn test_with_recursive() {
     );
     assert_eq!(to_sqlx.sql(), true_sql);
 }
+
+#[test]
+fn test_union() {
+    let mut pending_users = ChainBuilder::new(Client::Mysql);
+    pending_users
+        .db("mydb") // For dynamic db
+        .table("users")
+        .select(Select::Columns(vec!["*".into()]))
+        .query(|qb| {
+            qb.where_eq("status", Value::String("pending".to_string()));
+        });
+
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .union(pending_users)
+        .db("mydb") // For dynamic db
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    let true_sql =
+        "SELECT * FROM mydb.users WHERE name = ? UNION SELECT * FROM mydb.users WHERE status = ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![
+            Value::String("John".to_string()),
+            Value::String("pending".to_string())
+        ]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}
+
+#[test]
+fn test_union_all() {
+    let mut pending_users = ChainBuilder::new(Client::Mysql);
+    pending_users
+        .db("mydb") // For dynamic db
+        .table("users")
+        .select(Select::Columns(vec!["*".into()]))
+        .query(|qb| {
+            qb.where_eq("status", Value::String("pending".to_string()));
+        });
+
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .union_all(pending_users.clone())
+        .union_all(pending_users)
+        .db("mydb") // For dynamic db
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    let true_sql =
+        "SELECT * FROM mydb.users WHERE name = ? UNION ALL SELECT * FROM mydb.users WHERE status = ? UNION ALL SELECT * FROM mydb.users WHERE status = ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![
+            Value::String("John".to_string()),
+            Value::String("pending".to_string()),
+            Value::String("pending".to_string())
+        ]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}

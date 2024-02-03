@@ -61,7 +61,9 @@ pub struct ChainBuilder {
     insert_update: Value,
     sql_str: String,
     // alias, recursive, chain_builder
-    with: Vec<(String, bool, ChainBuilder)>,
+    query_with: Vec<(String, bool, ChainBuilder)>,
+    // is_all, chain_builder
+    query_union: Vec<(bool, ChainBuilder)>,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -91,7 +93,8 @@ impl ChainBuilder {
             method: Method::Select,
             insert_update: Value::Null,
             sql_str: String::new(),
-            with: Vec::new(),
+            query_with: Vec::new(),
+            query_union: Vec::new(),
         }
     }
 

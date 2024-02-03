@@ -19,7 +19,8 @@ pub struct ToSql {
     pub method: (String, Vec<Value>),
     pub join: (String, Vec<Value>),
     pub raw: (String, Vec<Value>),
-    pub with: (String, Vec<Value>),
+    pub sql_with: (String, Vec<Value>),
+    pub sql_union: (String, Vec<Value>),
 }
 
 pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
@@ -37,10 +38,10 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     // - with
     let mut with = String::new();
     let mut with_binds: Vec<serde_json::Value> = vec![];
-    if !chain_builder.with.is_empty() {
+    if !chain_builder.query_with.is_empty() {
         with.push_str("WITH");
         with.push(' ');
-        for (i, (alias, recursive, chain_builder)) in chain_builder.with.iter().enumerate() {
+        for (i, (alias, recursive, chain_builder)) in chain_builder.query_with.iter().enumerate() {
             if i > 0 {
                 with.push_str(", ");
             }
@@ -56,6 +57,25 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
             with_binds.extend(sql.1);
         }
         with.push(' ');
+    }
+    //  - union
+    let mut sql_union = String::new();
+    let mut sql_union_binds: Vec<serde_json::Value> = vec![];
+    if !chain_builder.query_union.is_empty() {
+        for (i, (is_all, chain_builder)) in chain_builder.query_union.iter().enumerate() {
+            if i > 0 {
+                sql_union.push(' ');
+            }
+            if *is_all {
+                sql_union.push_str("UNION ALL");
+            } else {
+                sql_union.push_str("UNION");
+            }
+            sql_union.push(' ');
+            let sql = merge_to_sql(to_sql(chain_builder));
+            sql_union.push_str(sql.0.as_str());
+            sql_union_binds.extend(sql.1);
+        }
     }
 
     // raw compiler
@@ -78,15 +98,16 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
         method,
         join,
         raw: (raw_sql, raw_binds),
-        with: (with, with_binds),
+        sql_with: (with, with_binds),
+        sql_union: (sql_union, sql_union_binds),
     }
 }
 
 pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
     let mut select_sql = String::new();
     let mut select_binds: Vec<serde_json::Value> = vec![];
-    if !to_sql.with.0.is_empty() {
-        select_sql.push_str(to_sql.with.0.as_str());
+    if !to_sql.sql_with.0.is_empty() {
+        select_sql.push_str(to_sql.sql_with.0.as_str());
     }
     if !to_sql.method.0.is_empty() {
         select_sql.push_str(to_sql.method.0.as_str());
@@ -99,20 +120,22 @@ pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
         select_sql.push(' ');
         select_sql.push_str(to_sql.statement.0.as_str());
     }
+
+    if !to_sql.sql_union.0.is_empty() {
+        select_sql.push(' ');
+        select_sql.push_str(to_sql.sql_union.0.as_str());
+    }
+
     if !to_sql.raw.0.is_empty() {
         select_sql.push(' ');
         select_sql.push_str(to_sql.raw.0.as_str());
     }
-    // Add all binds order by with, method, join, statement, raw
-    // 1. add with_binds
-    select_binds.extend(to_sql.with.1);
-    // 2 add select_binds
+    // Add all binds order by with, method, join, statement, union, raw
+    select_binds.extend(to_sql.sql_with.1);
     select_binds.extend(to_sql.method.1);
-    // 3. add join_binds
     select_binds.extend(to_sql.join.1);
-    // 4. add binds
     select_binds.extend(to_sql.statement.1);
-    // 5. add raw_binds
+    select_binds.extend(to_sql.sql_union.1);
     select_binds.extend(to_sql.raw.1);
 
     (select_sql, select_binds)
