@@ -86,6 +86,8 @@ pub enum Common {
     Offset(usize),
     GroupBy(Vec<String>),
     GroupByRaw(String, Option<Vec<serde_json::Value>>),
+    OrderBy(String, String),
+    OrderByRaw(String, Option<Vec<serde_json::Value>>),
 }
 
 impl ChainBuilder {

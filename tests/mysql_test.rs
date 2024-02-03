@@ -468,3 +468,59 @@ fn test_group_by_raw() {
     );
     assert_eq!(to_sqlx.sql(), true_sql);
 }
+
+#[test]
+fn test_order_by() {
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .db("mydb") // For dynamic db
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    builder.limit(10).offset(5);
+    builder.order_by("name", "ASC");
+    builder.order_by("city", "DESC");
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    let true_sql =
+        "SELECT * FROM mydb.users WHERE name = ? ORDER BY name ASC, city DESC LIMIT ? OFFSET ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![
+            Value::String("John".to_string()),
+            Value::Number(10.into()),
+            Value::Number(5.into())
+        ]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}
+
+#[test]
+fn test_order_by_raw() {
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .db("mydb") // For dynamic db
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    builder.limit(10).offset(5);
+    builder.order_by_raw("`count`, `name` order by (`name` is not null) desc", None);
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    let true_sql = "SELECT * FROM mydb.users WHERE name = ? ORDER BY `count`, `name` order by (`name` is not null) desc LIMIT ? OFFSET ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![
+            Value::String("John".to_string()),
+            Value::Number(10.into()),
+            Value::Number(5.into())
+        ]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}

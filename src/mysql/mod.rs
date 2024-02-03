@@ -25,6 +25,8 @@ pub struct ToSql {
     pub offset: Option<usize>,
     pub group_by: Vec<String>,
     pub group_by_raw: (String, Vec<Value>),
+    pub order_by: Vec<String>,
+    pub order_by_raw: (String, Vec<Value>),
 }
 
 pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
@@ -56,6 +58,12 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     // - group by raw
     let mut group_by_raw = String::new();
     let mut group_by_raw_binds: Vec<serde_json::Value> = vec![];
+    // - order by
+    let mut order_by: Vec<String> = vec![];
+    // - order by raw
+    let mut order_by_raw = String::new();
+    let mut order_by_raw_binds: Vec<serde_json::Value> = vec![];
+
     for common in chain_builder.query_common.iter() {
         match common {
             crate::Common::With(alias, recursive, chain_builder) => {
@@ -107,6 +115,15 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                     group_by_raw_binds.extend(b.clone());
                 }
             }
+            crate::Common::OrderBy(column, order) => {
+                order_by.push(format!("{} {}", column, order));
+            }
+            crate::Common::OrderByRaw(sql, val) => {
+                order_by_raw.push_str(sql.as_str());
+                if let Some(val) = val {
+                    order_by_raw_binds.extend(val.clone());
+                }
+            }
         }
     }
 
@@ -136,6 +153,8 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
         offset,
         group_by,
         group_by_raw: (group_by_raw, group_by_raw_binds),
+        order_by,
+        order_by_raw: (order_by_raw, order_by_raw_binds),
     }
 }
 
@@ -151,6 +170,8 @@ pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
     // - limit
     // - group by
     // - group by raw
+    // - order by
+    // - order by raw
     // - offset
     // - union
     // - raw
@@ -181,6 +202,15 @@ pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
         select_sql.push_str(" GROUP BY ");
         select_sql.push_str(to_sql.group_by_raw.0.as_str());
         select_binds.extend(to_sql.group_by_raw.1);
+    }
+    if !to_sql.order_by.is_empty() {
+        select_sql.push_str(" ORDER BY ");
+        select_sql.push_str(to_sql.order_by.join(", ").as_str());
+    }
+    if !to_sql.order_by_raw.0.is_empty() {
+        select_sql.push_str(" ORDER BY ");
+        select_sql.push_str(to_sql.order_by_raw.0.as_str());
+        select_binds.extend(to_sql.order_by_raw.1);
     }
     if let Some(limit) = to_sql.limit {
         select_sql.push(' ');
