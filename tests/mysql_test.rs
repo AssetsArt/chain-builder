@@ -414,3 +414,57 @@ fn test_limit_offset() {
     );
     assert_eq!(to_sqlx.sql(), true_sql);
 }
+
+#[test]
+fn test_group_by() {
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .db("mydb") // For dynamic db
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    builder.limit(10).offset(5);
+    builder.group_by(vec!["name", "city"]);
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    let true_sql = "SELECT * FROM mydb.users WHERE name = ? GROUP BY name, city LIMIT ? OFFSET ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![
+            Value::String("John".to_string()),
+            Value::Number(10.into()),
+            Value::Number(5.into())
+        ]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}
+
+#[test]
+fn test_group_by_raw() {
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .db("mydb") // For dynamic db
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    builder.limit(10).offset(5);
+    builder.group_by_raw("name, city", None);
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    let true_sql = "SELECT * FROM mydb.users WHERE name = ? GROUP BY name, city LIMIT ? OFFSET ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![
+            Value::String("John".to_string()),
+            Value::Number(10.into()),
+            Value::Number(5.into())
+        ]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}

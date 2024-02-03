@@ -84,6 +84,8 @@ pub enum Common {
     Union(bool, ChainBuilder),
     Limit(usize),
     Offset(usize),
+    GroupBy(Vec<String>),
+    GroupByRaw(String, Option<Vec<serde_json::Value>>),
 }
 
 impl ChainBuilder {
