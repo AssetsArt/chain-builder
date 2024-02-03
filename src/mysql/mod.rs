@@ -124,31 +124,8 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
 pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
     let mut select_sql = String::new();
     let mut select_binds: Vec<serde_json::Value> = vec![];
-    if !to_sql.sql_with.0.is_empty() {
-        select_sql.push_str(to_sql.sql_with.0.as_str());
-    }
-    if !to_sql.method.0.is_empty() {
-        select_sql.push_str(to_sql.method.0.as_str());
-    }
-    if !to_sql.join.0.is_empty() {
-        select_sql.push(' ');
-        select_sql.push_str(to_sql.join.0.as_str());
-    }
-    if !to_sql.statement.0.is_empty() {
-        select_sql.push(' ');
-        select_sql.push_str(to_sql.statement.0.as_str());
-    }
 
-    if !to_sql.sql_union.0.is_empty() {
-        select_sql.push(' ');
-        select_sql.push_str(to_sql.sql_union.0.as_str());
-    }
-
-    if !to_sql.raw.0.is_empty() {
-        select_sql.push(' ');
-        select_sql.push_str(to_sql.raw.0.as_str());
-    }
-    // Add all binds order by
+    // Add all order by
     // - with,
     // - method
     // - join
@@ -157,10 +134,25 @@ pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
     // - offset
     // - union
     // - raw
-    select_binds.extend(to_sql.sql_with.1);
-    select_binds.extend(to_sql.method.1);
-    select_binds.extend(to_sql.join.1);
-    select_binds.extend(to_sql.statement.1);
+
+    if !to_sql.sql_with.0.is_empty() {
+        select_sql.push_str(to_sql.sql_with.0.as_str());
+        select_binds.extend(to_sql.sql_with.1);
+    }
+    if !to_sql.method.0.is_empty() {
+        select_sql.push_str(to_sql.method.0.as_str());
+        select_binds.extend(to_sql.method.1);
+    }
+    if !to_sql.join.0.is_empty() {
+        select_sql.push(' ');
+        select_sql.push_str(to_sql.join.0.as_str());
+        select_binds.extend(to_sql.join.1);
+    }
+    if !to_sql.statement.0.is_empty() {
+        select_sql.push(' ');
+        select_sql.push_str(to_sql.statement.0.as_str());
+        select_binds.extend(to_sql.statement.1);
+    }
     if let Some(limit) = to_sql.limit {
         select_sql.push(' ');
         select_sql.push_str("LIMIT ?");
@@ -171,8 +163,16 @@ pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
         select_sql.push_str("OFFSET ?");
         select_binds.push(serde_json::Value::Number(serde_json::Number::from(offset)));
     }
-    select_binds.extend(to_sql.sql_union.1);
-    select_binds.extend(to_sql.raw.1);
+    if !to_sql.sql_union.0.is_empty() {
+        select_sql.push(' ');
+        select_sql.push_str(to_sql.sql_union.0.as_str());
+        select_binds.extend(to_sql.sql_union.1);
+    }
+    if !to_sql.raw.0.is_empty() {
+        select_sql.push(' ');
+        select_sql.push_str(to_sql.raw.0.as_str());
+        select_binds.extend(to_sql.raw.1);
+    }
 
     (select_sql, select_binds)
 }
