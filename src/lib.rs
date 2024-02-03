@@ -44,6 +44,9 @@ impl Statement {
 pub enum Method {
     Select,
     Insert,
+    InsertMany,
+    Update,
+    Delete,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -55,7 +58,7 @@ pub struct ChainBuilder {
     select: Vec<Select>,
     query: QueryBuilder,
     method: Method,
-    inner: Value,
+    insert_update: Value,
     sql_str: String,
 }
 
@@ -84,7 +87,7 @@ impl ChainBuilder {
             db: None,
             query: QueryBuilder::default(),
             method: Method::Select,
-            inner: Value::Null,
+            insert_update: Value::Null,
             sql_str: String::new(),
         }
     }
@@ -107,7 +110,24 @@ impl ChainBuilder {
 
     pub fn insert(&mut self, data: Value) -> &mut ChainBuilder {
         self.method = Method::Insert;
-        self.inner = data;
+        self.insert_update = data;
+        self
+    }
+
+    pub fn insert_many(&mut self, data: Vec<Value>) -> &mut ChainBuilder {
+        self.method = Method::InsertMany;
+        self.insert_update = Value::Array(data);
+        self
+    }
+
+    pub fn update(&mut self, data: Value) -> &mut ChainBuilder {
+        self.method = Method::Update;
+        self.insert_update = data;
+        self
+    }
+
+    pub fn delete(&mut self) -> &mut ChainBuilder {
+        self.method = Method::Delete;
         self
     }
 
