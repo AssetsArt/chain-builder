@@ -1,4 +1,4 @@
-use super::to_sql;
+use super::{merge_to_sql, to_sql};
 use crate::{ChainBuilder, Method, Select};
 use serde_json::Value;
 
@@ -168,33 +168,12 @@ fn select_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
                 }
                 Select::Builder(as_name, c2) => {
                     let rs_tosql = to_sql(c2);
+                    let rs_sql = merge_to_sql(rs_tosql);
                     select_sql.push('(');
-                    if !rs_tosql.method.0.is_empty() {
-                        select_sql.push_str(rs_tosql.method.0.as_str());
-                    }
-                    if !rs_tosql.join.0.is_empty() {
-                        select_sql.push(' ');
-                        select_sql.push_str(rs_tosql.join.0.as_str());
-                    }
-                    if !rs_tosql.statement.0.is_empty() {
-                        select_sql.push(' ');
-                        select_sql.push_str(rs_tosql.statement.0.as_str());
-                    }
-                    if !rs_tosql.raw.0.is_empty() {
-                        select_sql.push(' ');
-                        select_sql.push_str(rs_tosql.raw.0.as_str());
-                    }
+                    select_sql.push_str(rs_sql.0.as_str());
                     select_sql.push_str(") AS ");
                     select_sql.push_str(as_name.as_str());
-                    // Add all binds to select_binds order by select_binds, join_binds, binds, raw_binds
-                    // 1. add select_binds
-                    select_binds.extend(rs_tosql.method.1);
-                    // 2. add join_binds
-                    select_binds.extend(rs_tosql.join.1);
-                    // 3. add binds
-                    select_binds.extend(rs_tosql.statement.1);
-                    // 4. add raw_binds
-                    select_binds.extend(rs_tosql.raw.1);
+                    select_binds.extend(rs_sql.1);
                 }
             }
         }

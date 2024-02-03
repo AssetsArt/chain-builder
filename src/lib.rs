@@ -6,7 +6,7 @@ mod sqlx_mysql;
 // mods
 mod join;
 mod operator;
-mod where_clauses;
+mod query_builder;
 
 // use
 use serde_json::Value;
@@ -14,7 +14,7 @@ use serde_json::Value;
 // export
 pub use join::{JoinBuilder, JoinMethods};
 pub use operator::Operator;
-pub use where_clauses::WhereClauses;
+pub use query_builder::{QueryCommon, WhereClauses};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Client {
@@ -60,6 +60,7 @@ pub struct ChainBuilder {
     method: Method,
     insert_update: Value,
     sql_str: String,
+    with: Vec<(String, ChainBuilder)>,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -89,6 +90,7 @@ impl ChainBuilder {
             method: Method::Select,
             insert_update: Value::Null,
             sql_str: String::new(),
+            with: Vec::new(),
         }
     }
 
@@ -148,30 +150,9 @@ impl ChainBuilder {
         match self.client {
             #[cfg(feature = "mysql")]
             Client::Mysql => {
-                let rs = mysql::to_sql(self);
-                let mut sql: String = String::new();
-                if !rs.method.0.is_empty() {
-                    sql.push_str(rs.method.0.as_str());
-                }
-                if !rs.join.0.is_empty() {
-                    sql.push(' ');
-                    sql.push_str(rs.join.0.as_str());
-                }
-                if !rs.statement.0.is_empty() {
-                    sql.push(' ');
-                    sql.push_str(rs.statement.0.as_str());
-                }
-                if !rs.raw.0.is_empty() {
-                    sql.push(' ');
-                    sql.push_str(rs.raw.0.as_str());
-                }
-                let mut rs_binds: Vec<serde_json::Value> = vec![];
-                rs_binds.extend(rs.method.1);
-                rs_binds.extend(rs.join.1);
-                rs_binds.extend(rs.statement.1);
-                rs_binds.extend(rs.raw.1);
-                self.sql_str = sql;
-                (self.sql_str.clone(), rs_binds)
+                let rs = mysql::merge_to_sql(mysql::to_sql(self));
+                self.sql_str = rs.0.clone();
+                (self.sql_str.clone(), rs.1)
             }
             #[cfg(feature = "postgres")]
             Client::Postgres => {

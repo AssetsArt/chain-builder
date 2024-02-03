@@ -1,4 +1,4 @@
-use chain_builder::{ChainBuilder, Client, JoinMethods, Select, WhereClauses};
+use chain_builder::{ChainBuilder, Client, JoinMethods, QueryCommon, Select, WhereClauses};
 use serde_json::{self, Value};
 use sqlx::Execute;
 
@@ -224,5 +224,50 @@ fn test_delete() {
     let true_sql = "DELETE FROM mydb.users WHERE id = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, vec![Value::Number(1.into())]);
+    assert_eq!(to_sqlx.sql(), true_sql);
+}
+
+#[test]
+fn test_with() {
+    let mut slct = ChainBuilder::new(Client::Mysql);
+    slct.db("mydb") // For dynamic db
+        .table("address")
+        .select(Select::Columns(vec!["*".into()]))
+        .query(|qb| {
+            qb.where_eq("city", Value::String("New York".to_string()));
+        });
+
+    let mut active_users = ChainBuilder::new(Client::Mysql);
+    active_users
+        .db("mydb") // For dynamic db
+        .table("users")
+        .select(Select::Columns(vec!["*".into()]))
+        .select(Select::Builder("address".to_string(), slct))
+        .query(|qb| {
+            qb.where_eq("status", Value::String("active".to_string()));
+        });
+
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .with("active_users", active_users)
+        .select(Select::Columns(vec!["*".into()]))
+        .table("active_users")
+        .query(|qb| {
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    // println!("final sql: {}", sql.0);
+    // println!("final binds: {:?}", sql.1);
+    let true_sql = "WITH active_users AS (SELECT *, (SELECT * FROM mydb.address WHERE city = ?) AS address FROM mydb.users WHERE status = ?) SELECT * FROM active_users WHERE name = ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![
+            Value::String("New York".to_string()),
+            Value::String("active".to_string()),
+            Value::String("John".to_string())
+        ]
+    );
     assert_eq!(to_sqlx.sql(), true_sql);
 }
