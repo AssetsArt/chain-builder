@@ -60,10 +60,7 @@ pub struct ChainBuilder {
     method: Method,
     insert_update: Value,
     sql_str: String,
-    // alias, recursive, chain_builder
-    query_with: Vec<(String, bool, ChainBuilder)>,
-    // is_all, chain_builder
-    query_union: Vec<(bool, ChainBuilder)>,
+    query_common: Vec<Common>,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -81,6 +78,14 @@ pub enum Select {
     Builder(String, ChainBuilder),
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum Common {
+    With(String, bool, ChainBuilder),
+    Union(bool, ChainBuilder),
+    Limit(usize),
+    Offset(usize),
+}
+
 impl ChainBuilder {
     pub fn new(client: Client) -> ChainBuilder {
         ChainBuilder {
@@ -93,8 +98,7 @@ impl ChainBuilder {
             method: Method::Select,
             insert_update: Value::Null,
             sql_str: String::new(),
-            query_with: Vec::new(),
-            query_union: Vec::new(),
+            query_common: Vec::new(),
         }
     }
 

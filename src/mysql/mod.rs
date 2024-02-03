@@ -21,6 +21,8 @@ pub struct ToSql {
     pub raw: (String, Vec<Value>),
     pub sql_with: (String, Vec<Value>),
     pub sql_union: (String, Vec<Value>),
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
@@ -38,43 +40,57 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     // - with
     let mut with = String::new();
     let mut with_binds: Vec<serde_json::Value> = vec![];
-    if !chain_builder.query_with.is_empty() {
-        with.push_str("WITH");
-        with.push(' ');
-        for (i, (alias, recursive, chain_builder)) in chain_builder.query_with.iter().enumerate() {
-            if i > 0 {
-                with.push_str(", ");
-            }
-            if *recursive {
-                with.push_str("RECURSIVE");
-                with.push(' ');
-            }
-            with.push_str(alias.as_str());
-            with.push_str(" AS (");
-            let sql = merge_to_sql(to_sql(chain_builder));
-            with.push_str(sql.0.as_str());
-            with.push(')');
-            with_binds.extend(sql.1);
-        }
-        with.push(' ');
-    }
+    let mut is_first_with = true;
     //  - union
     let mut sql_union = String::new();
     let mut sql_union_binds: Vec<serde_json::Value> = vec![];
-    if !chain_builder.query_union.is_empty() {
-        for (i, (is_all, chain_builder)) in chain_builder.query_union.iter().enumerate() {
-            if i > 0 {
+    let mut is_first_union = true;
+    // - limit
+    let mut limit = None;
+    // - offset
+    let mut offset = None;
+    for common in chain_builder.query_common.iter() {
+        match common {
+            crate::Common::With(alias, recursive, chain_builder) => {
+                with.push_str("WITH");
+                with.push(' ');
+                if !is_first_with {
+                    with.push_str(", ");
+                }
+                is_first_with = false;
+                if *recursive {
+                    with.push_str("RECURSIVE");
+                    with.push(' ');
+                }
+                with.push_str(alias.as_str());
+                with.push_str(" AS (");
+                let sql = merge_to_sql(to_sql(chain_builder));
+                with.push_str(sql.0.as_str());
+                with.push(')');
+                with_binds.extend(sql.1);
+                with.push(' ');
+            }
+            crate::Common::Union(is_all, chain_builder) => {
+                if !is_first_union {
+                    sql_union.push(' ');
+                }
+                is_first_union = false;
+                if *is_all {
+                    sql_union.push_str("UNION ALL");
+                } else {
+                    sql_union.push_str("UNION");
+                }
                 sql_union.push(' ');
+                let sql = merge_to_sql(to_sql(chain_builder));
+                sql_union.push_str(sql.0.as_str());
+                sql_union_binds.extend(sql.1);
             }
-            if *is_all {
-                sql_union.push_str("UNION ALL");
-            } else {
-                sql_union.push_str("UNION");
+            crate::Common::Limit(l) => {
+                limit = Some(*l);
             }
-            sql_union.push(' ');
-            let sql = merge_to_sql(to_sql(chain_builder));
-            sql_union.push_str(sql.0.as_str());
-            sql_union_binds.extend(sql.1);
+            crate::Common::Offset(o) => {
+                offset = Some(*o);
+            }
         }
     }
 
@@ -100,6 +116,8 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
         raw: (raw_sql, raw_binds),
         sql_with: (with, with_binds),
         sql_union: (sql_union, sql_union_binds),
+        limit,
+        offset,
     }
 }
 
@@ -130,11 +148,29 @@ pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
         select_sql.push(' ');
         select_sql.push_str(to_sql.raw.0.as_str());
     }
-    // Add all binds order by with, method, join, statement, union, raw
+    // Add all binds order by
+    // - with,
+    // - method
+    // - join
+    // - statement
+    // - limit
+    // - offset
+    // - union
+    // - raw
     select_binds.extend(to_sql.sql_with.1);
     select_binds.extend(to_sql.method.1);
     select_binds.extend(to_sql.join.1);
     select_binds.extend(to_sql.statement.1);
+    if let Some(limit) = to_sql.limit {
+        select_sql.push(' ');
+        select_sql.push_str("LIMIT ?");
+        select_binds.push(serde_json::Value::Number(serde_json::Number::from(limit)));
+    }
+    if let Some(offset) = to_sql.offset {
+        select_sql.push(' ');
+        select_sql.push_str("OFFSET ?");
+        select_binds.push(serde_json::Value::Number(serde_json::Number::from(offset)));
+    }
     select_binds.extend(to_sql.sql_union.1);
     select_binds.extend(to_sql.raw.1);
 
