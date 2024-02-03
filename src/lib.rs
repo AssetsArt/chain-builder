@@ -1,7 +1,7 @@
 #[cfg(feature = "mysql")]
 mod mysql;
 #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
-mod sqlx_mysql;
+mod to_sqlx;
 
 // mods
 mod join;
