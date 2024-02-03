@@ -38,13 +38,21 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     let mut with = String::new();
     let mut with_binds: Vec<serde_json::Value> = vec![];
     if !chain_builder.with.is_empty() {
-        with.push_str("WITH ");
-        for (i, (alias, chain_builder)) in chain_builder.with.iter().enumerate() {
+        with.push_str("WITH");
+        with.push(' ');
+        for (i, (alias, recursive, chain_builder)) in chain_builder.with.iter().enumerate() {
             if i > 0 {
                 with.push_str(", ");
             }
+            if *recursive {
+                with.push_str("RECURSIVE");
+                with.push(' ');
+            }
+            with.push_str(alias.as_str());
+            with.push_str(" AS (");
             let sql = merge_to_sql(to_sql(chain_builder));
-            with.push_str(&format!("{} AS ({})", alias, sql.0));
+            with.push_str(sql.0.as_str());
+            with.push(')');
             with_binds.extend(sql.1);
         }
         with.push(' ');

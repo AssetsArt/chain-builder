@@ -60,7 +60,8 @@ pub struct ChainBuilder {
     method: Method,
     insert_update: Value,
     sql_str: String,
-    with: Vec<(String, ChainBuilder)>,
+    // alias, recursive, chain_builder
+    with: Vec<(String, bool, ChainBuilder)>,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
