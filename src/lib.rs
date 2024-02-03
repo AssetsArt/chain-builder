@@ -1,5 +1,8 @@
 #[cfg(feature = "mysql")]
 mod mysql;
+#[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
+mod sqlx_mysql;
+
 // mods
 mod join;
 mod operator;
@@ -113,6 +116,14 @@ impl ChainBuilder {
         self
     }
 
+    pub fn query(&mut self, query: impl FnOnce(&mut QueryBuilder)) {
+        query(&mut self.query);
+    }
+
+    pub fn add_raw(&mut self, sql: &str, val: Option<Vec<serde_json::Value>>) {
+        self.query.raw.push((sql.to_string(), val));
+    }
+
     pub fn to_sql(&mut self) -> (String, Vec<serde_json::Value>) {
         match self.client {
             #[cfg(feature = "mysql")]
@@ -150,74 +161,5 @@ impl ChainBuilder {
                 panic!("not support client");
             }
         }
-    }
-
-    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
-    pub fn to_sqlx_query<'a>(
-        &'a mut self,
-    ) -> sqlx::query::Query<'a, sqlx::MySql, sqlx::mysql::MySqlArguments> {
-        let (_, binds) = self.to_sql();
-        let sql = self.sql_str.as_str();
-        let mut qb = sqlx::query::<sqlx::MySql>(sql);
-        for bind in binds {
-            match bind {
-                serde_json::Value::String(v) => {
-                    qb = qb.bind(v);
-                }
-                serde_json::Value::Number(v) => {
-                    if v.is_f64() {
-                        qb = qb.bind(v.as_f64().unwrap_or(0.0));
-                    } else if v.is_u64() {
-                        qb = qb.bind(v.as_u64().unwrap_or(0));
-                    } else if v.is_i64() {
-                        qb = qb.bind(v.as_i64().unwrap_or(0));
-                    } else {
-                        qb = qb.bind(v.to_string());
-                    }
-                }
-                _ => {}
-            }
-        }
-        qb
-    }
-
-    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
-    pub fn to_sqlx_query_as<'a, 'q, T>(
-        &'a mut self,
-    ) -> sqlx::query::QueryAs<'_, sqlx::MySql, T, sqlx::mysql::MySqlArguments>
-    where
-        T: for<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow>,
-    {
-        let (_, binds) = self.to_sql();
-        let sql = self.sql_str.as_str();
-        let mut qb = sqlx::query_as::<_, T>(&sql);
-        for bind in binds {
-            match bind {
-                serde_json::Value::String(v) => {
-                    qb = qb.bind(v);
-                }
-                serde_json::Value::Number(v) => {
-                    if v.is_f64() {
-                        qb = qb.bind(v.as_f64().unwrap_or(0.0));
-                    } else if v.is_u64() {
-                        qb = qb.bind(v.as_u64().unwrap_or(0));
-                    } else if v.is_i64() {
-                        qb = qb.bind(v.as_i64().unwrap_or(0));
-                    } else {
-                        qb = qb.bind(v.to_string());
-                    }
-                }
-                _ => {}
-            }
-        }
-        qb
-    }
-
-    pub fn query(&mut self, query: impl FnOnce(&mut QueryBuilder)) {
-        query(&mut self.query);
-    }
-
-    pub fn add_raw(&mut self, sql: &str, val: Option<Vec<serde_json::Value>>) {
-        self.query.raw.push((sql.to_string(), val));
     }
 }
