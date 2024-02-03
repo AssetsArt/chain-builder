@@ -5,10 +5,12 @@ mod join;
 mod operator;
 mod where_clauses;
 
+// use
+use serde_json::Value;
+
 // export
 pub use join::{JoinBuilder, JoinMethods};
 pub use operator::Operator;
-use serde_json::Value;
 pub use where_clauses::WhereClauses;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -51,6 +53,7 @@ pub struct ChainBuilder {
     query: QueryBuilder,
     method: Method,
     inner: Value,
+    sql_str: String,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -79,6 +82,7 @@ impl ChainBuilder {
             query: QueryBuilder::default(),
             method: Method::Select,
             inner: Value::Null,
+            sql_str: String::new(),
         }
     }
 
@@ -109,7 +113,7 @@ impl ChainBuilder {
         self
     }
 
-    pub fn to_sql(&self) -> (String, Vec<serde_json::Value>) {
+    pub fn to_sql(&mut self) -> (String, Vec<serde_json::Value>) {
         match self.client {
             #[cfg(feature = "mysql")]
             Client::Mysql => {
@@ -135,7 +139,8 @@ impl ChainBuilder {
                 rs_binds.extend(rs.join.1);
                 rs_binds.extend(rs.statement.1);
                 rs_binds.extend(rs.raw.1);
-                (sql, rs_binds)
+                self.sql_str = sql;
+                (self.sql_str.clone(), rs_binds)
             }
             #[cfg(feature = "postgres")]
             Client::Postgres => {
@@ -149,10 +154,10 @@ impl ChainBuilder {
 
     #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub fn to_sqlx_query<'a>(
-        &'a self,
-        sql: &'a str,
-        binds: Vec<serde_json::Value>,
-    ) -> sqlx::query::Query<'_, sqlx::MySql, sqlx::mysql::MySqlArguments> {
+        &'a mut self,
+    ) -> sqlx::query::Query<'a, sqlx::MySql, sqlx::mysql::MySqlArguments> {
+        let (_, binds) = self.to_sql();
+        let sql = self.sql_str.as_str();
         let mut qb = sqlx::query::<sqlx::MySql>(sql);
         for bind in binds {
             match bind {
@@ -177,15 +182,15 @@ impl ChainBuilder {
     }
 
     #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
-    pub fn to_sqlx_query_as<'a, T>(
-        &'a self,
-        sql: &'a str,
-        binds: Vec<serde_json::Value>,
+    pub fn to_sqlx_query_as<'a, 'q, T>(
+        &'a mut self,
     ) -> sqlx::query::QueryAs<'_, sqlx::MySql, T, sqlx::mysql::MySqlArguments>
     where
         T: for<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow>,
     {
-        let mut qb = sqlx::query_as::<_, T>(sql);
+        let (_, binds) = self.to_sql();
+        let sql = self.sql_str.as_str();
+        let mut qb = sqlx::query_as::<_, T>(&sql);
         for bind in binds {
             match bind {
                 serde_json::Value::String(v) => {

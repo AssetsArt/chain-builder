@@ -1,5 +1,6 @@
 use chain_builder::{ChainBuilder, Client, JoinMethods, Select, WhereClauses};
 use serde_json::{self, Value};
+use sqlx::Execute;
 
 #[test]
 fn test_chain_builder() {
@@ -94,16 +95,16 @@ fn test_join() {
         Some(vec![Value::Number(1.into())]),
     ));
     let sql = builder.to_sql();
-    // println!("final sql: {}", sql.0);
+    let to_sqlx = builder.to_sqlx_query();
+    // println!("final sql: {:?}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    assert_eq!(
-            sql.0,
-            "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?"
-        );
+    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?";
+    assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
         vec![Value::Number(1.into()), Value::String("John".to_string()),]
     );
+    assert_eq!(to_sqlx.sql(), true_sql);
 }
 
 #[test]
@@ -117,12 +118,11 @@ fn test_insert() {
         "department": "IT",
     }));
     let sql = builder.to_sql();
-    println!("final sql: {}", sql.0);
-    println!("final binds: {:?}", sql.1);
-    assert_eq!(
-        sql.0,
-        "INSERT INTO mydb.users (`city`, department, name) VALUES (?, ?, ?)"
-    );
+    let to_sqlx = builder.to_sqlx_query();
+    // println!("final sql: {}", sql.0);
+    // println!("final binds: {:?}", sql.1);
+    let true_sql = "INSERT INTO mydb.users (`city`, department, name) VALUES (?, ?, ?)";
+    assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
         vec![
@@ -131,4 +131,5 @@ fn test_insert() {
             Value::String("John".to_string())
         ]
     );
+    assert_eq!(to_sqlx.sql(), true_sql);
 }

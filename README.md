@@ -15,6 +15,7 @@ cargo add chain-builder
 ```rust
 use chain_builder::{ChainBuilder, Select, WhereClauses, Client};
 use serde_json::{self, Value};
+
 let mut builder = ChainBuilder::new(Client::Mysql);
 builder.db("mydb"); // For dynamic db
 builder.select(Select::Columns(vec!["*".into()]));
