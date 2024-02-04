@@ -8,6 +8,13 @@ pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec
         if i > 0 {
             to_sql_str.push(' ');
         }
+
+        if let Some((raw, binds)) = &join.raw {
+            to_sql_str.push_str(raw);
+            to_binds.extend(binds.clone().unwrap_or_default());
+            continue;
+        }
+
         if prefix {
             let table = if let Some(db) = &chain_builder.db {
                 format!("{}.{}", db, join.table)

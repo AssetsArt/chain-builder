@@ -3,7 +3,14 @@ use crate::QueryBuilder;
 
 pub trait JoinMethods {
     fn join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
+    fn inner_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
     fn left_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
+    fn right_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
+    fn left_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
+    fn right_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
+    fn full_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
+    fn cross_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
+    fn raw_join(&mut self, raw: &str, val: Option<Vec<serde_json::Value>>);
 }
 
 impl JoinMethods for QueryBuilder {
@@ -12,6 +19,18 @@ impl JoinMethods for QueryBuilder {
             table: table.to_string(),
             statement: vec![],
             join_type: "JOIN".into(),
+            raw: None,
+        };
+        on(&mut join);
+        self.join.push(join);
+    }
+
+    fn inner_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
+        let mut join = JoinBuilder {
+            table: table.to_string(),
+            statement: vec![],
+            join_type: "INNER JOIN".into(),
+            raw: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -22,9 +41,74 @@ impl JoinMethods for QueryBuilder {
             table: table.to_string(),
             statement: vec![],
             join_type: "LEFT JOIN".into(),
+            raw: None,
         };
         on(&mut join);
         self.join.push(join);
+    }
+
+    fn right_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
+        let mut join = JoinBuilder {
+            table: table.to_string(),
+            statement: vec![],
+            join_type: "RIGHT JOIN".into(),
+            raw: None,
+        };
+        on(&mut join);
+        self.join.push(join);
+    }
+
+    fn left_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
+        let mut join = JoinBuilder {
+            table: table.to_string(),
+            statement: vec![],
+            join_type: "LEFT OUTER JOIN".into(),
+            raw: None,
+        };
+        on(&mut join);
+        self.join.push(join);
+    }
+
+    fn right_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
+        let mut join = JoinBuilder {
+            table: table.to_string(),
+            statement: vec![],
+            join_type: "RIGHT OUTER JOIN".into(),
+            raw: None,
+        };
+        on(&mut join);
+        self.join.push(join);
+    }
+
+    fn full_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
+        let mut join = JoinBuilder {
+            table: table.to_string(),
+            statement: vec![],
+            join_type: "FULL OUTER JOIN".into(),
+            raw: None,
+        };
+        on(&mut join);
+        self.join.push(join);
+    }
+
+    fn cross_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
+        let mut join = JoinBuilder {
+            table: table.to_string(),
+            statement: vec![],
+            join_type: "CROSS JOIN".into(),
+            raw: None,
+        };
+        on(&mut join);
+        self.join.push(join);
+    }
+
+    fn raw_join(&mut self, raw: &str, val: Option<Vec<serde_json::Value>>) {
+        self.join.push(JoinBuilder {
+            table: raw.to_string(),
+            statement: vec![],
+            join_type: "".into(),
+            raw: Some((raw.to_string(), val)),
+        });
     }
 }
 

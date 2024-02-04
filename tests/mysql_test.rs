@@ -110,6 +110,79 @@ fn test_join() {
 }
 
 #[test]
+fn test_tow_join() {
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .db("mydb") // For dynamic db
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.join("details", |join| {
+                join.on("details.id", "=", "users.d_id");
+                join.on("details.id_w", "=", "users.d_id_w");
+                join.or().on("details.id_s", "=", "users.d_id_s").on(
+                    "details.id_w",
+                    "=",
+                    "users.d_id_w",
+                );
+            });
+            qb.join("address", |join| {
+                join.on("address.id", "=", "users.a_id");
+                join.on("address.id_w", "=", "users.a_id_w");
+                join.or().on("address.id_s", "=", "users.a_id_s").on(
+                    "address.id_w",
+                    "=",
+                    "users.a_id_w",
+                );
+            });
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    builder.select(Select::Raw(
+        "(SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count".into(),
+        Some(vec![Value::Number(1.into())]),
+    ));
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    // println!("final sql: {:?}", sql.0);
+    // println!("final binds: {:?}", sql.1);
+    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) JOIN mydb.address ON address.id = users.a_id AND address.id_w = users.a_id_w OR (address.id_s = users.a_id_s AND address.id_w = users.a_id_w) WHERE name = ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![Value::Number(1.into()), Value::String("John".to_string()),]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}
+
+#[test]
+fn test_join_raw() {
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .db("mydb") // For dynamic db
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.raw_join("LEFT JOIN details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w)", None);
+            qb.where_eq("name", Value::String("John".to_string()));
+        });
+    builder.select(Select::Raw(
+        "(SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count".into(),
+        Some(vec![Value::Number(1.into())]),
+    ));
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    // println!("final sql: {:?}", sql.0);
+    // println!("final binds: {:?}", sql.1);
+    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users LEFT JOIN details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![Value::Number(1.into()), Value::String("John".to_string()),]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}
+
+#[test]
 fn test_insert() {
     let mut builder = ChainBuilder::new(Client::Mysql);
     builder

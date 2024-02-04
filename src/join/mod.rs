@@ -24,4 +24,5 @@ pub struct JoinBuilder {
     pub(crate) table: String,
     pub(crate) join_type: String,
     pub(crate) statement: Vec<JoinStatement>,
+    pub(crate) raw: Option<(String, Option<Vec<serde_json::Value>>)>,
 }
