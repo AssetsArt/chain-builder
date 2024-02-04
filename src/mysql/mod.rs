@@ -64,7 +64,7 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     let mut order_by_raw = String::new();
     let mut order_by_raw_binds: Vec<serde_json::Value> = vec![];
 
-    for common in chain_builder.query_common.iter() {
+    for common in chain_builder.query.query_common.iter() {
         match common {
             crate::Common::With(alias, recursive, chain_builder) => {
                 with.push_str("WITH");

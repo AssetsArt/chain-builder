@@ -60,7 +60,6 @@ pub struct ChainBuilder {
     method: Method,
     insert_update: Value,
     sql_str: String,
-    query_common: Vec<Common>,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -68,6 +67,7 @@ pub struct QueryBuilder {
     statement: Vec<Statement>,
     raw: Vec<(String, Option<Vec<serde_json::Value>>)>,
     join: Vec<JoinBuilder>,
+    query_common: Vec<Common>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -102,7 +102,6 @@ impl ChainBuilder {
             method: Method::Select,
             insert_update: Value::Null,
             sql_str: String::new(),
-            query_common: Vec::new(),
         }
     }
 
@@ -147,6 +146,38 @@ impl ChainBuilder {
 
     pub fn as_name(&mut self, name: &str) -> &mut ChainBuilder {
         self.as_name = Some(name.to_string());
+        self
+    }
+
+    pub fn with(&mut self, alias: &str, chain_builder: ChainBuilder) -> &mut ChainBuilder {
+        self.query
+            .query_common
+            .push(Common::With(alias.to_string(), false, chain_builder));
+        self
+    }
+
+    pub fn with_recursive(
+        &mut self,
+        alias: &str,
+        chain_builder: ChainBuilder,
+    ) -> &mut ChainBuilder {
+        self.query
+            .query_common
+            .push(Common::With(alias.to_string(), true, chain_builder));
+        self
+    }
+
+    pub fn union(&mut self, chain_builder: ChainBuilder) -> &mut ChainBuilder {
+        self.query
+            .query_common
+            .push(Common::Union(false, chain_builder));
+        self
+    }
+
+    pub fn union_all(&mut self, chain_builder: ChainBuilder) -> &mut ChainBuilder {
+        self.query
+            .query_common
+            .push(Common::Union(true, chain_builder));
         self
     }
 

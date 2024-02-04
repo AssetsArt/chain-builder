@@ -398,8 +398,8 @@ fn test_limit_offset() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
+            qb.limit(10).offset(5);
         });
-    builder.limit(10).offset(5);
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql = "SELECT * FROM mydb.users WHERE name = ? LIMIT ? OFFSET ?";
@@ -424,9 +424,9 @@ fn test_group_by() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
+            qb.limit(10).offset(5);
+            qb.group_by(vec!["name", "city"]);
         });
-    builder.limit(10).offset(5);
-    builder.group_by(vec!["name", "city"]);
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql = "SELECT * FROM mydb.users WHERE name = ? GROUP BY name, city LIMIT ? OFFSET ?";
@@ -451,9 +451,9 @@ fn test_group_by_raw() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
+            qb.limit(10).offset(5);
+            qb.group_by_raw("name, city", None);
         });
-    builder.limit(10).offset(5);
-    builder.group_by_raw("name, city", None);
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql = "SELECT * FROM mydb.users WHERE name = ? GROUP BY name, city LIMIT ? OFFSET ?";
@@ -478,10 +478,10 @@ fn test_order_by() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
+            qb.limit(10).offset(5);
+            qb.order_by("name", "ASC");
+            qb.order_by("city", "DESC");
         });
-    builder.limit(10).offset(5);
-    builder.order_by("name", "ASC");
-    builder.order_by("city", "DESC");
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql =
@@ -507,9 +507,9 @@ fn test_order_by_raw() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
+            qb.limit(10).offset(5);
+            qb.order_by_raw("`count`, `name` order by (`name` is not null) desc", None);
         });
-    builder.limit(10).offset(5);
-    builder.order_by_raw("`count`, `name` order by (`name` is not null) desc", None);
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql = "SELECT * FROM mydb.users WHERE name = ? ORDER BY `count`, `name` order by (`name` is not null) desc LIMIT ? OFFSET ?";
