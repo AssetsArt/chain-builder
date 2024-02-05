@@ -105,6 +105,11 @@ impl ChainBuilder {
         }
     }
 
+    #[cfg(feature = "mysql")]
+    pub fn new_mysql() -> ChainBuilder {
+        ChainBuilder::new(Client::Mysql)
+    }
+
     pub fn db(&mut self, db: &str) -> &mut ChainBuilder {
         self.db = Some(db.to_string());
         self
