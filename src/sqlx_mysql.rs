@@ -1,3 +1,4 @@
+use serde_json::Value;
 use crate::ChainBuilder;
 
 impl ChainBuilder {
@@ -24,7 +25,7 @@ impl ChainBuilder {
                     }
                 },
                 serde_json::Value::Null => {
-                    let null_data: Option<f64> = None;
+                    let null_data: Option<Value> = None;
                     qb = qb.bind(null_data);
                 }
                 _ => {}
