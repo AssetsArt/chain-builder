@@ -24,8 +24,7 @@ impl ChainBuilder {
                     }
                 },
                 serde_json::Value::Null => {
-                    let null_data: Option<String> = None;
-                    println!("null_data: {:?}", null_data);
+                    let null_data: Option<f64> = None;
                     qb = qb.bind(null_data);
                 }
                 _ => {}
