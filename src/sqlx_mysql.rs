@@ -28,7 +28,9 @@ impl ChainBuilder {
                     let null_data: Option<Value> = None;
                     qb = qb.bind(null_data);
                 }
-                _ => {}
+                _ => {
+                    qb = qb.bind(bind);   
+                }
             }
         }
         qb
@@ -63,7 +65,9 @@ impl ChainBuilder {
                     let null_data: Option<Value> = None;
                     qb = qb.bind(null_data);
                 }
-                _ => {}
+                _ => {
+                    qb = qb.bind(bind);   
+                }
             }
         }
         qb
