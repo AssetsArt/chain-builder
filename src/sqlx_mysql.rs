@@ -57,6 +57,10 @@ impl ChainBuilder {
                     } else {
                         qb = qb.bind(v.to_string());
                     }
+                },
+                serde_json::Value::Null => {
+                    let null_data: Option<String> = None;
+                    qb = qb.bind(null_data);
                 }
                 _ => {}
             }
@@ -64,3 +68,4 @@ impl ChainBuilder {
         qb
     }
 }
+
