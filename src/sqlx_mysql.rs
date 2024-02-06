@@ -1,5 +1,5 @@
-use serde_json::Value;
 use crate::ChainBuilder;
+use serde_json::Value;
 
 impl ChainBuilder {
     pub fn to_sqlx_query(
@@ -23,20 +23,20 @@ impl ChainBuilder {
                     } else {
                         qb = qb.bind(v.to_string());
                     }
-                },
+                }
                 serde_json::Value::Bool(v) => {
                     qb = qb.bind(v);
-                },
+                }
                 serde_json::Value::Null => {
                     let null_data: Option<Value> = None;
                     qb = qb.bind(null_data);
-                },
+                }
                 serde_json::Value::Object(v) => {
                     let to_string = serde_json::to_string(&v).unwrap_or_default();
                     qb = qb.bind(to_string);
                 }
                 _ => {
-                    qb = qb.bind(bind);   
+                    qb = qb.bind(bind);
                 }
             }
         }
@@ -67,10 +67,10 @@ impl ChainBuilder {
                     } else {
                         qb = qb.bind(v.to_string());
                     }
-                },
+                }
                 serde_json::Value::Bool(v) => {
                     qb = qb.bind(v);
-                },
+                }
                 serde_json::Value::Null => {
                     let null_data: Option<Value> = None;
                     qb = qb.bind(null_data);
@@ -80,11 +80,10 @@ impl ChainBuilder {
                     qb = qb.bind(to_string);
                 }
                 _ => {
-                    qb = qb.bind(bind);   
+                    qb = qb.bind(bind);
                 }
             }
         }
         qb
     }
 }
-
