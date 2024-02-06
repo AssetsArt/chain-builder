@@ -22,6 +22,10 @@ impl ChainBuilder {
                     } else {
                         qb = qb.bind(v.to_string());
                     }
+                },
+                serde_json::Value::Null => {
+                    let null: Option<String> = None;
+                    qb = qb.bind(null);
                 }
                 _ => {}
             }
