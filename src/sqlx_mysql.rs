@@ -24,9 +24,16 @@ impl ChainBuilder {
                         qb = qb.bind(v.to_string());
                     }
                 },
+                serde_json::Value::Bool(v) => {
+                    qb = qb.bind(v);
+                },
                 serde_json::Value::Null => {
                     let null_data: Option<Value> = None;
                     qb = qb.bind(null_data);
+                },
+                serde_json::Value::Object(v) => {
+                    let to_string = serde_json::to_string(&v).unwrap_or_default();
+                    qb = qb.bind(to_string);
                 }
                 _ => {
                     qb = qb.bind(bind);   
@@ -61,9 +68,16 @@ impl ChainBuilder {
                         qb = qb.bind(v.to_string());
                     }
                 },
+                serde_json::Value::Bool(v) => {
+                    qb = qb.bind(v);
+                },
                 serde_json::Value::Null => {
                     let null_data: Option<Value> = None;
                     qb = qb.bind(null_data);
+                }
+                serde_json::Value::Object(v) => {
+                    let to_string = serde_json::to_string(&v).unwrap_or_default();
+                    qb = qb.bind(to_string);
                 }
                 _ => {
                     qb = qb.bind(bind);   
