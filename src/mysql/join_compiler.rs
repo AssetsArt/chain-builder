@@ -21,7 +21,11 @@ pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec
             } else {
                 join.table.clone()
             };
-            to_sql_str.push_str(&format!("{} {} ON ", join.join_type, table));
+            if let Some(as_name) = &join.as_name {
+                to_sql_str.push_str(&format!("{} {} as {} ON ", join.join_type, table, as_name));
+            } else {
+                to_sql_str.push_str(&format!("{} {} ON ", join.join_type, table));
+            }
         }
 
         for (j, statement) in join.statement.iter().enumerate() {
@@ -48,6 +52,13 @@ pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec
                     }
                     to_sql_str.push_str(format!("{} {} ?", column, operator).as_str());
                     to_binds.push(value.clone());
+                }
+                JoinStatement::OnRaw(raw, binds) => {
+                    if j > 0 {
+                        to_sql_str.push_str(" AND ");
+                    }
+                    to_sql_str.push_str(raw);
+                    to_binds.extend(binds.clone().unwrap_or_default());
                 }
             }
         }

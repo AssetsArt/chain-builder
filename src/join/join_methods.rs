@@ -20,6 +20,7 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "JOIN".into(),
             raw: None,
+            as_name: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -31,6 +32,7 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "INNER JOIN".into(),
             raw: None,
+            as_name: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -42,6 +44,7 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "LEFT JOIN".into(),
             raw: None,
+            as_name: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -53,6 +56,7 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "RIGHT JOIN".into(),
             raw: None,
+            as_name: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -64,6 +68,7 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "LEFT OUTER JOIN".into(),
             raw: None,
+            as_name: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -75,6 +80,7 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "RIGHT OUTER JOIN".into(),
             raw: None,
+            as_name: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -86,6 +92,7 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "FULL OUTER JOIN".into(),
             raw: None,
+            as_name: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -97,6 +104,7 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "CROSS JOIN".into(),
             raw: None,
+            as_name: None,
         };
         on(&mut join);
         self.join.push(join);
@@ -108,11 +116,17 @@ impl JoinMethods for QueryBuilder {
             statement: vec![],
             join_type: "".into(),
             raw: Some((raw.to_string(), val)),
+            as_name: None,
         });
     }
 }
 
 impl JoinBuilder {
+    pub fn as_name(&mut self, name: &str) -> &mut Self {
+        self.as_name = Some(name.to_string());
+        self
+    }
+
     pub fn on(&mut self, column: &str, operator: &str, column2: &str) -> &mut Self {
         self.statement.push(JoinStatement::On(
             column.to_string(),
@@ -136,6 +150,12 @@ impl JoinBuilder {
             operator.to_string(),
             value,
         ));
+        self
+    }
+
+    pub fn on_raw(&mut self, raw: &str, val: Option<Vec<serde_json::Value>>) -> &mut Self {
+        self.statement
+            .push(JoinStatement::OnRaw(raw.to_string(), val));
         self
     }
 }

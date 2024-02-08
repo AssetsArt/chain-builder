@@ -8,6 +8,7 @@ pub(crate) enum JoinStatement {
     On(String, String, String),
     OrChain(Box<JoinBuilder>),
     OnVal(String, String, serde_json::Value),
+    OnRaw(String, Option<Vec<serde_json::Value>>),
 }
 
 impl JoinStatement {
@@ -25,4 +26,5 @@ pub struct JoinBuilder {
     pub(crate) join_type: String,
     pub(crate) statement: Vec<JoinStatement>,
     pub(crate) raw: Option<(String, Option<Vec<serde_json::Value>>)>,
+    pub(crate) as_name: Option<String>,
 }
