@@ -60,6 +60,7 @@ pub struct ChainBuilder {
     method: Method,
     insert_update: Value,
     sql_str: String,
+    is_distinct: bool,
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
@@ -102,6 +103,7 @@ impl ChainBuilder {
             method: Method::Select,
             insert_update: Value::Null,
             sql_str: String::new(),
+            is_distinct: false,
         }
     }
 
@@ -117,6 +119,11 @@ impl ChainBuilder {
 
     pub fn table(&mut self, table: &str) -> &mut ChainBuilder {
         self.table = table.to_string();
+        self
+    }
+
+    pub fn distinct(&mut self) -> &mut ChainBuilder {
+        self.is_distinct = true;
         self
     }
 

@@ -143,8 +143,11 @@ fn insert_many_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
 fn select_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     let mut select_sql = String::new();
     let mut select_binds: Vec<serde_json::Value> = vec![];
-
-    select_sql.push_str("SELECT ");
+    if chain_builder.is_distinct {
+        select_sql.push_str("SELECT DISTINCT ");
+    } else {
+        select_sql.push_str("SELECT ");
+    }
 
     if chain_builder.select.is_empty() {
         select_sql.push('*');
