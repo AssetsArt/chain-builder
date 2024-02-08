@@ -597,3 +597,35 @@ fn test_order_by_raw() {
     );
     assert_eq!(to_sqlx.sql(), true_sql);
 }
+
+// table_raw
+#[test]
+fn test_table_raw() {
+    let mut builder = ChainBuilder::new(Client::Mysql);
+    builder
+        .db("mydb") // For dynamic db
+        .table_raw(
+            "(SELECT * FROM users WHERE id = ?) as pp",
+            Some(vec![Value::Number(1.into())]),
+        )
+        .select(Select::Columns(vec!["*".into()]))
+        .query(|qb| {
+            qb.where_eq("name", Value::String("John".to_string()));
+            qb.limit(10).offset(5);
+            qb.order_by_raw("`count`, `name` order by (`name` is not null) desc", None);
+        });
+    let sql = builder.to_sql();
+    let to_sqlx = builder.to_sqlx_query();
+    let true_sql = "SELECT * FROM (SELECT * FROM users WHERE id = ?) as pp WHERE name = ? ORDER BY `count`, `name` order by (`name` is not null) desc LIMIT ? OFFSET ?";
+    assert_eq!(sql.0, true_sql);
+    assert_eq!(
+        sql.1,
+        vec![
+            Value::Number(1.into()),
+            Value::String("John".to_string()),
+            Value::Number(10.into()),
+            Value::Number(5.into())
+        ]
+    );
+    assert_eq!(to_sqlx.sql(), true_sql);
+}

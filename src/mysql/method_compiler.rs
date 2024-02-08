@@ -16,12 +16,19 @@ pub fn method_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
 fn insert_into_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     let mut insert_sql = String::new();
     let mut insert_binds: Vec<serde_json::Value> = vec![];
-
     insert_sql.push_str("INSERT INTO ");
-    if let Some(db) = &chain_builder.db {
-        insert_sql.push_str(format!("{}.", db).as_str());
+
+    if let Some((table, val)) = &chain_builder.table_raw {
+        insert_sql.push_str(table);
+        if let Some(val) = val {
+            insert_binds.extend(val.clone());
+        }
+    } else if let Some(table) = &chain_builder.table {
+        if let Some(db) = &chain_builder.db {
+            insert_sql.push_str(format!("{}.", db).as_str());
+        }
+        insert_sql.push_str(table.as_str());
     }
-    insert_sql.push_str(chain_builder.table.as_str());
 
     insert_sql.push_str(" (");
     let mut is_first = true;
@@ -75,10 +82,17 @@ fn insert_many_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     let mut insert_binds: Vec<serde_json::Value> = vec![];
 
     insert_sql.push_str("INSERT INTO ");
-    if let Some(db) = &chain_builder.db {
-        insert_sql.push_str(format!("{}.", db).as_str());
+    if let Some((table, val)) = &chain_builder.table_raw {
+        insert_sql.push_str(table);
+        if let Some(val) = val {
+            insert_binds.extend(val.clone());
+        }
+    } else if let Some(table) = &chain_builder.table {
+        if let Some(db) = &chain_builder.db {
+            insert_sql.push_str(format!("{}.", db).as_str());
+        }
+        insert_sql.push_str(table.as_str());
     }
-    insert_sql.push_str(chain_builder.table.as_str());
 
     insert_sql.push_str(" (");
     let mut is_first = true;
@@ -183,10 +197,17 @@ fn select_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     }
 
     select_sql.push_str(" FROM ");
-    if let Some(db) = &chain_builder.db {
-        select_sql.push_str(format!("{}.", db).as_str());
+    if let Some((table, val)) = &chain_builder.table_raw {
+        select_sql.push_str(table);
+        if let Some(val) = val {
+            select_binds.extend(val.clone());
+        }
+    } else if let Some(table) = &chain_builder.table {
+        if let Some(db) = &chain_builder.db {
+            select_sql.push_str(format!("{}.", db).as_str());
+        }
+        select_sql.push_str(table.as_str());
     }
-    select_sql.push_str(chain_builder.table.as_str());
     if let Some(as_name) = &chain_builder.as_name {
         select_sql.push_str(" AS ");
         select_sql.push_str(as_name);
@@ -200,10 +221,17 @@ fn update_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     let mut update_binds: Vec<serde_json::Value> = vec![];
 
     update_sql.push_str("UPDATE ");
-    if let Some(db) = &chain_builder.db {
-        update_sql.push_str(format!("{}.", db).as_str());
+    if let Some((table, val)) = &chain_builder.table_raw {
+        update_sql.push_str(table);
+        if let Some(val) = val {
+            update_binds.extend(val.clone());
+        }
+    } else if let Some(table) = &chain_builder.table {
+        if let Some(db) = &chain_builder.db {
+            update_sql.push_str(format!("{}.", db).as_str());
+        }
+        update_sql.push_str(table.as_str());
     }
-    update_sql.push_str(chain_builder.table.as_str());
     update_sql.push_str(" SET ");
     let map_default = serde_json::Map::new();
     let data = chain_builder
@@ -241,11 +269,19 @@ fn update_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
 // Delete
 fn delete_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     let mut delete_sql = String::new();
+    let mut delete_binds: Vec<serde_json::Value> = vec![];
     delete_sql.push_str("DELETE FROM ");
-    if let Some(db) = &chain_builder.db {
-        delete_sql.push_str(format!("{}.", db).as_str());
+    if let Some((table, val)) = &chain_builder.table_raw {
+        delete_sql.push_str(table);
+        if let Some(val) = val {
+            delete_binds.extend(val.clone());
+        }
+    } else if let Some(table) = &chain_builder.table {
+        if let Some(db) = &chain_builder.db {
+            delete_sql.push_str(format!("{}.", db).as_str());
+        }
+        delete_sql.push_str(table.as_str());
     }
-    delete_sql.push_str(chain_builder.table.as_str());
 
-    (delete_sql, vec![])
+    (delete_sql, delete_binds)
 }

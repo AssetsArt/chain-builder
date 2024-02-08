@@ -53,7 +53,8 @@ pub enum Method {
 pub struct ChainBuilder {
     client: Client,
     db: Option<String>,
-    table: String,
+    table: Option<String>,
+    table_raw: Option<(String, Option<Vec<serde_json::Value>>)>,
     as_name: Option<String>,
     select: Vec<Select>,
     query: QueryBuilder,
@@ -95,7 +96,8 @@ impl ChainBuilder {
     pub fn new(client: Client) -> ChainBuilder {
         ChainBuilder {
             client,
-            table: String::new(),
+            table: None,
+            table_raw: None,
             select: Vec::new(),
             as_name: None,
             db: None,
@@ -118,7 +120,16 @@ impl ChainBuilder {
     }
 
     pub fn table(&mut self, table: &str) -> &mut ChainBuilder {
-        self.table = table.to_string();
+        self.table = Some(table.to_string());
+        self
+    }
+
+    pub fn table_raw(
+        &mut self,
+        table: &str,
+        val: Option<Vec<serde_json::Value>>,
+    ) -> &mut ChainBuilder {
+        self.table_raw = Some((table.to_string(), val));
         self
     }
 
