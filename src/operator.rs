@@ -12,4 +12,9 @@ pub enum Operator {
     NotBetween,
     Like,
     NotLike,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
+    GreaterORLessThan,
 }

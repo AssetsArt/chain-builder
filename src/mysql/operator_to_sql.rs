@@ -15,5 +15,10 @@ pub fn operator_to_sql(operator: &Operator) -> (&str, bool) {
         Operator::NotBetween => ("NOT BETWEEN", true),
         Operator::Like => ("LIKE", true),
         Operator::NotLike => ("NOT LIKE", true),
+        Operator::GreaterThan => (">", true),
+        Operator::GreaterThanOrEqual => (">=", true),
+        Operator::LessThan => ("<", true),
+        Operator::LessThanOrEqual => ("<=", true),
+        Operator::GreaterORLessThan => ("<>", true),
     }
 }

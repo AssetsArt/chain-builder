@@ -22,6 +22,11 @@ pub trait WhereClauses {
     fn where_subquery(&mut self, value: impl FnOnce(&mut QueryBuilder));
     fn or(&mut self) -> &mut QueryBuilder;
     fn where_raw(&mut self, sql: &str, val: Option<Vec<serde_json::Value>>) -> &mut Self;
+    fn where_gt(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
+    fn where_gte(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
+    fn where_lt(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
+    fn where_lte(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
+    fn where_gtlt(&mut self, column: &str, value: serde_json::Value) -> &mut Self;
 }
 
 impl WhereClauses for QueryBuilder {
@@ -112,5 +117,25 @@ impl WhereClauses for QueryBuilder {
 
     fn where_not_like(&mut self, column: &str, value: serde_json::Value) -> &mut Self {
         self.where_clause(column, Operator::NotLike, value)
+    }
+
+    fn where_gt(&mut self, column: &str, value: serde_json::Value) -> &mut Self {
+        self.where_clause(column, Operator::GreaterThan, value)
+    }
+
+    fn where_gte(&mut self, column: &str, value: serde_json::Value) -> &mut Self {
+        self.where_clause(column, Operator::GreaterThanOrEqual, value)
+    }
+
+    fn where_lt(&mut self, column: &str, value: serde_json::Value) -> &mut Self {
+        self.where_clause(column, Operator::LessThan, value)
+    }
+
+    fn where_lte(&mut self, column: &str, value: serde_json::Value) -> &mut Self {
+        self.where_clause(column, Operator::LessThanOrEqual, value)
+    }
+
+    fn where_gtlt(&mut self, column: &str, value: serde_json::Value) -> &mut Self {
+        self.where_clause(column, Operator::GreaterORLessThan, value)
     }
 }
