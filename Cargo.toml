@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 keywords = ["mysql", "query", "builder", "rust"]
 categories = ["database", "mysql", "query", "builder", "rust"]
-repository = "https://github.com/Aitthi/chain-builder.git"
+repository = "https://github.com/AssetsArt/chain-builder.git"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
