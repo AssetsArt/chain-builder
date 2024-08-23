@@ -9,40 +9,40 @@ impl ChainBuilder {
             match bind {
                 serde_json::Value::String(v) => {
                     // qb = qb.bind(v);
-                    arguments.add(v);
+                    let _ = arguments.add(v);
                 }
                 serde_json::Value::Number(v) => {
                     if v.is_f64() {
                         // qb = qb.bind(v.as_f64().unwrap_or(0.0));
-                        arguments.add(v.as_f64().unwrap_or(0.0));
+                        let _ = arguments.add(v.as_f64().unwrap_or(0.0));
                     } else if v.is_u64() {
                         // qb = qb.bind(v.as_u64().unwrap_or(0));
-                        arguments.add(v.as_u64().unwrap_or(0));
+                        let _ = arguments.add(v.as_u64().unwrap_or(0));
                     } else if v.is_i64() {
                         // qb = qb.bind(v.as_i64().unwrap_or(0));
-                        arguments.add(v.as_i64().unwrap_or(0));
+                        let _ = arguments.add(v.as_i64().unwrap_or(0));
                     } else {
                         // qb = qb.bind(v.to_string());
-                        arguments.add(v.to_string());
+                        let _ = arguments.add(v.to_string());
                     }
                 }
                 serde_json::Value::Bool(v) => {
                     // qb = qb.bind(v);
-                    arguments.add(v);
+                    let _ = arguments.add(v);
                 }
                 serde_json::Value::Null => {
                     let null_data: Option<Value> = None;
                     // qb = qb.bind(null_data);
-                    arguments.add(null_data);
+                    let _ = arguments.add(null_data);
                 }
                 serde_json::Value::Object(v) => {
                     let to_string = serde_json::to_string(&v).unwrap_or_default();
                     // qb = qb.bind(to_string);
-                    arguments.add(to_string);
+                    let _ = arguments.add(to_string);
                 }
                 _ => {
                     // qb = qb.bind(bind);
-                    arguments.add(bind);
+                    let _ = arguments.add(bind);
                 }
             }
         }

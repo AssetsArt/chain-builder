@@ -1,6 +1,6 @@
 [package]
 name = "chain-builder"
-version = "0.1.24"
+version = "0.1.25"
 edition = "2021"
 description = "A query builder for MySQL for Rust is designed to be flexible and easy to use."
 license = "MIT"
@@ -13,7 +13,7 @@ repository = "https://github.com/AssetsArt/chain-builder.git"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sqlx = { version = "0.7" }
+sqlx = { version = "0.8" }
 
 [dev-dependencies]
 chain-builder = { path = ".", default-features = false, features = ["dev-dependencies"] }
