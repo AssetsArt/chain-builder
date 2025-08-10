@@ -47,11 +47,11 @@ chain-builder = { version = "1.0.0", features = ["sqlx_sqlite"] }
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
 ```
 
-For full features (MySQL + SQLite):
+For both MySQL and SQLite with sqlx integration:
 
 ```toml
 [dependencies]
-chain-builder = { version = "1.0.0", features = ["full"] }
+chain-builder = { version = "1.0.0", features = ["sqlx_mysql", "sqlx_sqlite"] }
 sqlx = { version = "0.8", features = ["mysql", "sqlite", "runtime-tokio-rustls"] }
 ```
 
@@ -384,8 +384,8 @@ async fn main() -> Result<(), sqlx::Error> {
             qb.where_eq("status", Value::String("active".to_string()));
         });
     
-    // Convert to sqlx query
-    let query = builder.to_sqlx_query_sqlite();
+    // Convert to sqlx query (available with sqlx_sqlite feature)
+    let query = builder.to_sqlx_query();
     
     // Execute
     let rows = query.fetch_all(&pool).await?;
@@ -425,6 +425,12 @@ The main query builder class.
 - `select_max(column)` - MAX aggregate
 - `select_min(column)` - MIN aggregate
 - `select_alias(column, alias)` - SELECT with alias
+
+#### sqlx Integration Methods (Conditional)
+
+- `to_sqlx_query()` - Convert to sqlx query (requires sqlx_mysql or sqlx_sqlite feature)
+- `to_sqlx_query_as<T>()` - Convert to typed sqlx query (requires sqlx_mysql or sqlx_sqlite feature)
+- `count(column, pool)` - Count rows (MySQL only, requires sqlx_mysql feature)
 
 ### QueryBuilder
 
@@ -495,8 +501,18 @@ The library is organized into several modules:
 - **`src/common/`** - Shared compilation logic
 - **`src/mysql/`** - MySQL-specific compilation
 - **`src/sqlite/`** - SQLite-specific compilation
-- **`src/sqlx_mysql.rs`** - MySQL sqlx integration
-- **`src/sqlx_sqlite.rs`** - SQLite sqlx integration
+- **`src/sqlx_mysql.rs`** - MySQL sqlx integration (conditional compilation)
+- **`src/sqlx_sqlite.rs`** - SQLite sqlx integration (conditional compilation)
+
+## Feature Flags
+
+The library uses feature flags to control functionality:
+
+- **`mysql`** (default) - Enable MySQL support
+- **`sqlite`** - Enable SQLite support
+- **`sqlx_mysql`** (default) - Enable MySQL sqlx integration
+- **`sqlx_sqlite`** - Enable SQLite sqlx integration
+- **`postgres`** - Enable PostgreSQL support (future)
 
 ## License
 

@@ -84,7 +84,7 @@ This is a major release with significant improvements, new features, and archite
 - **Database-specific optimizations** for MySQL and SQLite
 
 #### 📦 Package Structure
-- **Feature flags**: Better feature organization (`mysql`, `sqlite`, `sqlx_mysql`, `sqlx_sqlite`, `full`)
+- **Feature flags**: Better feature organization (`mysql`, `sqlite`, `sqlx_mysql`, `sqlx_sqlite`)
 - **Default features**: MySQL and sqlx_mysql enabled by default
 - **Test organization**: Separate test files for MySQL and SQLite
 
@@ -130,6 +130,33 @@ This is a major release with significant improvements, new features, and archite
 - **Better type safety** with improved type system
 - **Safer SQL generation** with proper escaping
 
+## [1.0.1] - 2024-01-15
+
+### 🔧 Conditional Compilation and Enhanced sqlx Integration
+
+#### Added
+- **Conditional SQL query generation** for MySQL and SQLite
+- **Enhanced argument handling** with improved type management
+- **New sqlx methods for SQLite**:
+  - `to_sqlx_query()` - Convert to sqlx query for SQLite
+  - `to_sqlx_query_as<T>()` - Convert to typed sqlx query for SQLite
+  - `value_to_arguments()` - Internal method for SQLite argument conversion
+
+#### Changed
+- **Conditional compilation** for all sqlx methods:
+  - MySQL methods now require `#[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]`
+  - SQLite methods now require `#[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]`
+- **Feature flag organization**:
+  - Removed `full` feature flag
+  - Updated `dev-dependencies` to use `["mysql", "sqlite"]` instead of `["full"]`
+  - Better separation of MySQL and SQLite features
+
+#### Technical Improvements
+- **Improved type safety** with conditional compilation
+- **Better feature flag management** for cleaner dependency resolution
+- **Enhanced SQLite support** with proper sqlx integration
+- **Consistent API** between MySQL and SQLite sqlx methods
+
 ## Migration Guide
 
 ### For Users
@@ -153,12 +180,22 @@ chain-builder = "0.1.25"
 chain-builder = "1.0.0"
 ```
 
+#### Feature Flag Changes
+```toml
+# Old (if using full feature)
+chain-builder = { version = "1.0.0", features = ["full"] }
+
+# New (explicit features)
+chain-builder = { version = "1.0.0", features = ["sqlx_mysql", "sqlx_sqlite"] }
+```
+
 #### New Features Available
 - SQLite support: `ChainBuilder::new(Client::Sqlite)`
 - Advanced WHERE clauses: `where_ilike()`, `where_column()`, `where_exists()`
 - HAVING clauses: `having()`, `having_between()`, `having_in()`
 - Aggregate functions: `select_count()`, `select_sum()`, `select_avg()`, etc.
 - Advanced JOINs: `full_outer_join()`, `cross_join()`, `join_using()`
+- Unified sqlx API: `to_sqlx_query()` works for both MySQL and SQLite
 
 ### For Contributors
 
@@ -173,6 +210,7 @@ chain-builder = "1.0.0"
 - Use feature flags for database-specific functionality
 - Tests are organized by database type
 - Common functionality is shared between database compilers
+- Conditional compilation ensures proper feature isolation
 
 ## Future Plans
 
