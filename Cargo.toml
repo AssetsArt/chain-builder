@@ -1,6 +1,6 @@
 [package]
 name = "chain-builder"
-version = "0.1.26"
+version = "0.1.27"
 edition = "2021"
 description = "A query builder for MySQL for Rust is designed to be flexible and easy to use."
 license = "MIT"
@@ -20,10 +20,12 @@ chain-builder = { path = ".", default-features = false, features = ["dev-depende
 
 [features]
 default = ["mysql", "sqlx_mysql"]
-full = ["mysql", "sqlx_mysql"]
+full = ["mysql", "sqlx_mysql", "sqlite", "sqlx_sqlite"]
 sqlx_mysql = ["sqlx/mysql"]
+sqlx_sqlite = ["sqlx/sqlite"]
 mysql = []
 postgres = []
+sqlite = []
 dev-dependencies = ["full"]
 
 
@@ -31,3 +33,8 @@ dev-dependencies = ["full"]
 name = "mysql_test"
 path = "tests/mysql_test.rs"
 required-features = ["mysql"]
+
+[[test]]
+name = "sqlite_test"
+path = "tests/sqlite_test.rs"
+required-features = ["sqlite"]

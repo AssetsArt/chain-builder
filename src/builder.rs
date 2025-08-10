@@ -58,6 +58,11 @@ impl ChainBuilder {
     pub fn new_mysql() -> ChainBuilder {
         ChainBuilder::new(Client::Mysql)
     }
+    
+    #[cfg(feature = "sqlite")]
+    pub fn new_sqlite() -> ChainBuilder {
+        ChainBuilder::new(Client::Sqlite)
+    }
 
     /// Set the database name
     pub fn db(&mut self, db: &str) -> &mut ChainBuilder {
@@ -279,6 +284,12 @@ impl ChainBuilder {
             #[cfg(feature = "mysql")]
             Client::Mysql => {
                 let rs = crate::mysql::merge_to_sql(crate::mysql::to_sql(self));
+                self.sql_str = rs.0.clone();
+                (self.sql_str.clone(), rs.1)
+            }
+            #[cfg(feature = "sqlite")]
+            Client::Sqlite => {
+                let rs = crate::sqlite::merge_to_sql(crate::sqlite::to_sql(self));
                 self.sql_str = rs.0.clone();
                 (self.sql_str.clone(), rs.1)
             }

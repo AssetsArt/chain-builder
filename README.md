@@ -39,12 +39,36 @@ sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-rustls"] }
 use chain_builder::{ChainBuilder, Client, Select};
 use serde_json::Value;
 
-// Create a new query builder
+// Create a new query builder for MySQL
 let mut builder = ChainBuilder::new(Client::Mysql);
 
 // Build a simple SELECT query
 builder
     .db("mydb")
+    .select(Select::Columns(vec!["*".into()]))
+    .table("users")
+    .query(|qb| {
+        qb.where_eq("name", Value::String("John".to_string()));
+        qb.where_eq("status", Value::String("active".to_string()));
+    });
+
+// Generate SQL
+let (sql, binds) = builder.to_sql();
+println!("SQL: {}", sql);
+println!("Binds: {:?}", binds);
+```
+
+### SQLite Example
+
+```rust
+use chain_builder::{ChainBuilder, Client, Select};
+use serde_json::Value;
+
+// Create a new query builder for SQLite
+let mut builder = ChainBuilder::new(Client::Sqlite);
+
+// Build a simple SELECT query
+builder
     .select(Select::Columns(vec!["*".into()]))
     .table("users")
     .query(|qb| {
@@ -289,6 +313,8 @@ builder
 
 ## sqlx Integration
 
+### MySQL with sqlx
+
 ```rust
 use chain_builder::{ChainBuilder, Client, Select};
 use sqlx::mysql::MySqlPool;
@@ -308,6 +334,34 @@ async fn main() -> Result<(), sqlx::Error> {
     
     // Convert to sqlx query
     let query = builder.to_sqlx_query();
+    
+    // Execute
+    let rows = query.fetch_all(&pool).await?;
+    
+    Ok(())
+}
+```
+
+### SQLite with sqlx
+
+```rust
+use chain_builder::{ChainBuilder, Client, Select};
+use sqlx::sqlite::SqlitePool;
+
+#[tokio::main]
+async fn main() -> Result<(), sqlx::Error> {
+    let pool = SqlitePool::connect("sqlite://path/to/database.db").await?;
+    
+    let mut builder = ChainBuilder::new(Client::Sqlite);
+    builder
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_eq("status", Value::String("active".to_string()));
+        });
+    
+    // Convert to sqlx query
+    let query = builder.to_sqlx_query_sqlite();
     
     // Execute
     let rows = query.fetch_all(&pool).await?;

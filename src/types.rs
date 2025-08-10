@@ -10,6 +10,8 @@ pub enum Client {
     Mysql,
     /// PostgreSQL database (not yet implemented)
     Postgres,
+    /// SQLite database
+    Sqlite,
 }
 
 /// SQL statement types for WHERE clauses

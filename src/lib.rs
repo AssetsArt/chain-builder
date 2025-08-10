@@ -36,6 +36,10 @@ mod query;
 mod mysql;
 #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
 mod sqlx_mysql;
+#[cfg(feature = "sqlite")]
+mod sqlite;
+#[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
+mod sqlx_sqlite;
 
 // Re-export main types
 pub use types::{Client, Method, Statement, Select, Common};

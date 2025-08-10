@@ -7,6 +7,11 @@
 - **Enhanced Documentation**: Added comprehensive documentation with examples and API reference
 - **Better Error Handling**: Improved error handling in statement compiler to avoid panics
 - **Type Safety**: Enhanced type safety throughout the codebase
+- **SQLite Support**: Full SQLite database support with dedicated compiler
+  - SQLite-specific SQL generation
+  - SQLite sqlx integration (`to_sqlx_query_sqlite()`)
+  - SQLite LIMIT/OFFSET syntax support
+  - Complete test coverage for SQLite functionality
 - **Advanced WHERE Clauses**:
   - `where_ilike()` - Case-insensitive LIKE
   - `where_column()` - Column-to-column comparison
