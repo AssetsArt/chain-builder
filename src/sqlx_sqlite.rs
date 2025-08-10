@@ -16,6 +16,34 @@ impl ChainBuilder {
 
         (sql, args)
     }
+
+    #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
+    pub fn to_sqlx_query(
+        &mut self,
+    ) -> sqlx::query::Query<'_, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'_>> {
+        let (_, binds) = self.to_sql();
+        sqlx::query_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
+    }
+
+    #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
+    pub fn to_sqlx_query_as<T>(
+        &mut self,
+    ) -> sqlx::query::QueryAs<'_, sqlx::Sqlite, T, sqlx::sqlite::SqliteArguments<'_>>
+    where
+        T: for<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow>,
+    {
+        let (_, binds) = self.to_sql();
+        sqlx::query_as_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
+    }
+
+    #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
+    fn value_to_arguments(&self, binds: &Vec<Value>) -> SqliteArguments<'static> {
+        let mut arguments: SqliteArguments<'static> = SqliteArguments::default();
+        for bind in binds {
+            push_sqlite_arg(&mut arguments, bind.clone());
+        }
+        arguments
+    }
 }
 
 #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]

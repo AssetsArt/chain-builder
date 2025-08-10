@@ -20,13 +20,12 @@ chain-builder = { path = ".", default-features = false, features = ["dev-depende
 
 [features]
 default = ["mysql", "sqlx_mysql"]
-full = ["mysql", "sqlx_mysql", "sqlite", "sqlx_sqlite"]
 sqlx_mysql = ["sqlx/mysql"]
 sqlx_sqlite = ["sqlx/sqlite"]
 mysql = []
 postgres = []
 sqlite = []
-dev-dependencies = ["full"]
+dev-dependencies = ["mysql", "sqlite"]
 
 
 [[test]]

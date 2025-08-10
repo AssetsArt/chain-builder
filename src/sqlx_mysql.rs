@@ -3,6 +3,7 @@ use serde_json::Value;
 use sqlx::{self, mysql::MySqlArguments, Arguments, Row};
 
 impl ChainBuilder {
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     fn value_to_arguments(&self, binds: &Vec<Value>) -> MySqlArguments {
         let mut arguments: MySqlArguments = MySqlArguments::default();
         for bind in binds {
@@ -46,6 +47,7 @@ impl ChainBuilder {
         arguments
     }
 
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub fn to_sqlx_query(
         &mut self,
     ) -> sqlx::query::Query<'_, sqlx::MySql, sqlx::mysql::MySqlArguments> {
@@ -53,6 +55,7 @@ impl ChainBuilder {
         sqlx::query_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
     }
 
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub fn to_sqlx_query_as<T>(
         &mut self,
     ) -> sqlx::query::QueryAs<'_, sqlx::MySql, T, sqlx::mysql::MySqlArguments>
@@ -63,6 +66,7 @@ impl ChainBuilder {
         sqlx::query_as_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
     }
 
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub async fn count(
         &mut self,
         column: &str,
