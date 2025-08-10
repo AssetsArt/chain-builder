@@ -1,17 +1,22 @@
-mod join_compiler;
-mod method_compiler;
-mod operator_to_sql;
-mod statement_compiler;
-
 use serde_json::Value;
 
 // inner
 use crate::{
-    mysql::{method_compiler::method_compiler, statement_compiler::statement_compiler},
     builder::ChainBuilder,
+    common::{
+        join_compiler::join_compiler,
+        method_compiler::{method_compiler_with_provider, ToSqlProvider},
+        statement_compiler::statement_compiler,
+    },
 };
 
-use self::join_compiler::join_compiler;
+struct MySqlToSqlProvider;
+
+impl ToSqlProvider for MySqlToSqlProvider {
+    fn to_sql(&self, chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
+        merge_to_sql(to_sql(chain_builder))
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct ToSql {
@@ -37,7 +42,7 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
         statement.0 = format!("WHERE {}", statement.0);
     }
     // compiler method
-    let method = method_compiler(chain_builder);
+    let method = method_compiler_with_provider(chain_builder, &MySqlToSqlProvider);
     // join compiler
     let join = join_compiler(chain_builder, true);
 

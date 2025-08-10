@@ -1,4 +1,3 @@
-use super::operator_to_sql::operator_to_sql;
 use crate::{builder::ChainBuilder, query::Operator, types::Statement};
 use serde_json::Value;
 
@@ -8,7 +7,7 @@ pub fn statement_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) 
     let mut is_first = true;
     let mut build_statement = |statement: &Statement| match statement {
         Statement::Value(field, operator, value) => {
-            let (operator_str, is_bind) = operator_to_sql(operator);
+            let (operator_str, is_bind) = super::operator_to_sql::operator_to_sql(operator);
             if is_first {
                 is_first = false;
             } else {

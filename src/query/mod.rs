@@ -3,8 +3,8 @@
 pub mod common;
 pub mod join;
 
+use crate::types::{Common, Statement};
 use serde_json::Value;
-use crate::types::{Statement, Common};
 
 /// Main query builder for constructing WHERE clauses and other query parts
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]

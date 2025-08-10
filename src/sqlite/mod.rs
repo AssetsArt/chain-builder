@@ -1,17 +1,20 @@
 //! SQLite-specific compilation logic
 
-mod method_compiler;
-mod operator_to_sql;
-mod statement_compiler;
-mod join_compiler;
-
 use crate::builder::ChainBuilder;
 use serde_json::Value;
 
-// Re-export compilation functions
-pub use method_compiler::method_compiler;
-pub use statement_compiler::statement_compiler;
-pub use join_compiler::join_compiler;
+// Re-export compilation functions from common
+pub use crate::common::join_compiler::join_compiler;
+pub use crate::common::method_compiler::{method_compiler_with_provider, ToSqlProvider};
+pub use crate::common::statement_compiler::statement_compiler;
+
+struct SqliteToSqlProvider;
+
+impl ToSqlProvider for SqliteToSqlProvider {
+    fn to_sql(&self, chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
+        merge_to_sql(to_sql(chain_builder))
+    }
+}
 
 /// SQLite compilation result structure
 #[derive(Debug, Clone, Default)]
@@ -35,7 +38,7 @@ pub struct ToSql {
 pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     // Compile different parts
     let statement = statement_compiler(chain_builder);
-    let method = method_compiler(chain_builder);
+    let method = method_compiler_with_provider(chain_builder, &SqliteToSqlProvider);
     let join = join_compiler(chain_builder, true);
     let _raw = (String::new(), Vec::<Value>::new());
 

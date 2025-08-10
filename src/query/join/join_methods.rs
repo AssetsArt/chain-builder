@@ -8,31 +8,31 @@ use serde_json::Value;
 pub trait JoinMethods {
     /// Add a JOIN clause
     fn join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
-    
+
     /// Add an INNER JOIN clause
     fn inner_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
-    
+
     /// Add a LEFT JOIN clause
     fn left_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
-    
+
     /// Add a RIGHT JOIN clause
     fn right_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
-    
+
     /// Add a LEFT OUTER JOIN clause
     fn left_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
-    
+
     /// Add a RIGHT OUTER JOIN clause
     fn right_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
-    
+
     /// Add a FULL OUTER JOIN clause
     fn full_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
-    
+
     /// Add a CROSS JOIN clause
     fn cross_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
-    
+
     /// Add a JOIN USING clause
     fn join_using(&mut self, table: &str, columns: Vec<String>);
-    
+
     /// Add a raw JOIN clause
     fn raw_join(&mut self, raw: &str, val: Option<Vec<Value>>);
 }
@@ -121,7 +121,7 @@ impl JoinMethods for QueryBuilder {
         on(&mut join);
         self.join.push(join);
     }
-    
+
     fn full_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
         let mut join = JoinBuilder {
             table: table.to_string(),
@@ -133,7 +133,7 @@ impl JoinMethods for QueryBuilder {
         on(&mut join);
         self.join.push(join);
     }
-    
+
     fn join_using(&mut self, table: &str, columns: Vec<String>) {
         let columns_str = columns.join(", ");
         let sql = format!("JOIN {} USING ({})", table, columns_str);

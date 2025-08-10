@@ -1,11 +1,11 @@
 //! Main ChainBuilder implementation for building SQL queries
 
-use serde_json::Value;
-use crate::types::{Client, Method, Select, Common};
 use crate::query::QueryBuilder;
+use crate::types::{Client, Common, Method, Select};
+use serde_json::Value;
 
 /// Main query builder for constructing SQL queries
-/// 
+///
 /// This is the primary interface for building SQL queries with a fluent API.
 /// It supports all major SQL operations including SELECT, INSERT, UPDATE, DELETE,
 /// as well as complex features like JOINs, CTEs, and subqueries.
@@ -58,7 +58,7 @@ impl ChainBuilder {
     pub fn new_mysql() -> ChainBuilder {
         ChainBuilder::new(Client::Mysql)
     }
-    
+
     #[cfg(feature = "sqlite")]
     pub fn new_sqlite() -> ChainBuilder {
         ChainBuilder::new(Client::Sqlite)
@@ -77,11 +77,7 @@ impl ChainBuilder {
     }
 
     /// Set a raw table expression
-    pub fn table_raw(
-        &mut self,
-        table: &str,
-        val: Option<Vec<Value>>,
-    ) -> &mut ChainBuilder {
+    pub fn table_raw(&mut self, table: &str, val: Option<Vec<Value>>) -> &mut ChainBuilder {
         self.table_raw = Some((table.to_string(), val));
         self
     }
@@ -98,14 +94,14 @@ impl ChainBuilder {
         self.select.push(select);
         self
     }
-    
+
     /// Add a raw SELECT expression
     pub fn select_raw(&mut self, sql: &str, binds: Option<Vec<Value>>) -> &mut ChainBuilder {
         self.method = Method::Select;
         self.select.push(Select::Raw(sql.to_string(), binds));
         self
     }
-    
+
     /// Add DISTINCT SELECT
     pub fn select_distinct(&mut self, columns: Vec<String>) -> &mut ChainBuilder {
         self.method = Method::Select;
@@ -113,46 +109,52 @@ impl ChainBuilder {
         self.select.push(Select::Columns(columns));
         self
     }
-    
+
     /// Add COUNT aggregate function
     pub fn select_count(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select.push(Select::Raw(format!("COUNT({})", column), None));
+        self.select
+            .push(Select::Raw(format!("COUNT({})", column), None));
         self
     }
-    
+
     /// Add SUM aggregate function
     pub fn select_sum(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select.push(Select::Raw(format!("SUM({})", column), None));
+        self.select
+            .push(Select::Raw(format!("SUM({})", column), None));
         self
     }
-    
+
     /// Add AVG aggregate function
     pub fn select_avg(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select.push(Select::Raw(format!("AVG({})", column), None));
+        self.select
+            .push(Select::Raw(format!("AVG({})", column), None));
         self
     }
-    
+
     /// Add MAX aggregate function
     pub fn select_max(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select.push(Select::Raw(format!("MAX({})", column), None));
+        self.select
+            .push(Select::Raw(format!("MAX({})", column), None));
         self
     }
-    
+
     /// Add MIN aggregate function
     pub fn select_min(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select.push(Select::Raw(format!("MIN({})", column), None));
+        self.select
+            .push(Select::Raw(format!("MIN({})", column), None));
         self
     }
-    
+
     /// Add SELECT with alias
     pub fn select_alias(&mut self, column: &str, alias: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select.push(Select::Raw(format!("{} AS {}", column, alias), None));
+        self.select
+            .push(Select::Raw(format!("{} AS {}", column, alias), None));
         self
     }
 
@@ -176,7 +178,7 @@ impl ChainBuilder {
         self.insert_update = data;
         self
     }
-    
+
     /// Add INSERT IGNORE (MySQL)
     pub fn insert_ignore(&mut self, data: Value) -> &mut ChainBuilder {
         self.method = Method::Insert;
@@ -184,7 +186,7 @@ impl ChainBuilder {
         // Note: This will need special handling in the SQL compiler
         self
     }
-    
+
     /// Add UPSERT (INSERT ... ON DUPLICATE KEY UPDATE)
     pub fn insert_or_update(&mut self, data: Value, _update_data: Value) -> &mut ChainBuilder {
         self.method = Method::Insert;
@@ -192,14 +194,14 @@ impl ChainBuilder {
         // Note: This will need special handling in the SQL compiler
         self
     }
-    
+
     /// Add raw UPDATE statement
     pub fn update_raw(&mut self, _sql: &str, _binds: Option<Vec<Value>>) -> &mut ChainBuilder {
         self.method = Method::Update;
         // Note: This will need special handling in the SQL compiler
         self
     }
-    
+
     /// Increment a column value
     pub fn increment(&mut self, column: &str, amount: i64) -> &mut ChainBuilder {
         self.method = Method::Update;
@@ -209,7 +211,7 @@ impl ChainBuilder {
         self.insert_update = update_data;
         self
     }
-    
+
     /// Decrement a column value
     pub fn decrement(&mut self, column: &str, amount: i64) -> &mut ChainBuilder {
         self.method = Method::Update;

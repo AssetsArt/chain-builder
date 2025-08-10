@@ -1,7 +1,7 @@
 //! Core types and enums for the Chain Builder library
 
-use serde_json::Value;
 use crate::query::QueryBuilder;
+use serde_json::Value;
 
 /// Supported database clients
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

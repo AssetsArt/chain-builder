@@ -18,42 +18,44 @@ impl ChainBuilder {
 }
 
 #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
-fn push_sqlite_arg(args: &mut SqliteArguments, v: Value) {
+fn push_sqlite_arg(arguments: &mut SqliteArguments, v: Value) {
     match v {
-        Value::Null => {
-            let _ = args.add(Option::<i32>::None); // NULL ชนิดไหนก็ได้
+        serde_json::Value::String(v) => {
+            // qb = qb.bind(v);
+            let _ = arguments.add(v);
         }
-        Value::Bool(b) => {
-            // SQLite รองรับ bool ผ่าน sqlx (encode เป็น INTEGER 0/1)
-            let _ = args.add(b);
-        }
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                let _ = args.add(i);
-            } else if let Some(u) = n.as_u64() {
-                // SQLite เป็น signed 64-bit; ระวัง overflow
-                if u <= i64::MAX as u64 {
-                    let _ = args.add(u as i64);
-                } else {
-                    // ใหญ่เกิน เก็บเป็น string ปลอดภัยกว่า
-                    let _ = args.add(u.to_string());
-                }
-            } else if let Some(f) = n.as_f64() {
-                let _ = args.add(f);
+        serde_json::Value::Number(v) => {
+            if v.is_f64() {
+                // qb = qb.bind(v.as_f64().unwrap_or(0.0));
+                let _ = arguments.add(v.as_f64().unwrap_or(0.0));
+            } else if v.is_u64() {
+                // qb = qb.bind(v.as_u64().unwrap_or(0));
+                let _ = arguments.add(v.as_u64().unwrap_or(0) as i64);
+            } else if v.is_i64() {
+                // qb = qb.bind(v.as_i64().unwrap_or(0));
+                let _ = arguments.add(v.as_i64().unwrap_or(0));
             } else {
-                let _ = args.add(n.to_string());
+                // qb = qb.bind(v.to_string());
+                let _ = arguments.add(v.to_string());
             }
         }
-        Value::String(s) => {
-            let _ = args.add(s);
+        serde_json::Value::Bool(v) => {
+            // qb = qb.bind(v);
+            let _ = arguments.add(v);
         }
-        Value::Array(arr) => {
-            // เก็บเป็น JSON text
-            let _ = args.add(serde_json::to_string(&arr).unwrap());
+        serde_json::Value::Null => {
+            let null_data: Option<Value> = None;
+            // qb = qb.bind(null_data);
+            let _ = arguments.add(null_data);
         }
-        Value::Object(obj) => {
-            // เก็บเป็น JSON text
-            let _ = args.add(serde_json::to_string(&obj).unwrap());
+        serde_json::Value::Object(v) => {
+            let to_string = serde_json::to_string(&v).unwrap_or_default();
+            // qb = qb.bind(to_string);
+            let _ = arguments.add(to_string);
+        }
+        _ => {
+            // qb = qb.bind(bind);
+            let _ = arguments.add(v);
         }
     }
 }
