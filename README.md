@@ -7,6 +7,10 @@ A flexible and easy-to-use query builder for MySQL in Rust. This library provide
 - **Fluent API**: Chain methods for intuitive query building
 - **Type Safety**: Compile-time safety with Rust's type system
 - **Complex Queries**: Support for JOINs, CTEs, UNIONs, and subqueries
+- **Advanced WHERE Clauses**: EXISTS, NOT EXISTS, ILIKE, column comparisons, JSON operations
+- **HAVING Clauses**: Support for aggregate function filtering
+- **Aggregate Functions**: COUNT, SUM, AVG, MAX, MIN with aliases
+- **Advanced JOINs**: FULL OUTER JOIN, CROSS JOIN, JOIN USING
 - **Raw SQL**: Fallback to raw SQL when needed
 - **Multiple Operations**: SELECT, INSERT, UPDATE, DELETE
 - **sqlx Integration**: Direct integration with sqlx for async database operations
@@ -94,7 +98,7 @@ builder
     });
 ```
 
-### Complex WHERE Clauses
+### Advanced WHERE Clauses
 
 ```rust
 builder.query(|qb| {
@@ -104,19 +108,25 @@ builder.query(|qb| {
         Value::String("HR".to_string()),
     ]);
     
-    // Subquery
-    qb.where_subquery(|sub| {
-        sub.where_eq("status", Value::String("pending".to_string()));
-        sub.or()
-            .where_eq("status", Value::String("approved".to_string()))
-            .where_between(
-                "created_at",
-                [
-                    Value::String("2024-01-01".to_string()),
-                    Value::String("2024-01-31".to_string()),
-                ],
-            );
+    // Case-insensitive LIKE
+    qb.where_ilike("name", Value::String("john".to_string()));
+    
+    // Column-to-column comparison
+    qb.where_column("users.age", ">", "profiles.min_age");
+    
+    // EXISTS subquery
+    qb.where_exists(|sub| {
+        sub.db("mydb")
+            .table("orders")
+            .select(Select::Columns(vec!["id".into()]))
+            .query(|sub_qb| {
+                sub_qb.where_column("orders.user_id", "=", "users.id");
+                sub_qb.where_eq("status", Value::String("completed".to_string()));
+            });
     });
+    
+    // JSON contains
+    qb.where_json_contains("metadata", Value::String("premium".to_string()));
     
     // Raw SQL
     qb.where_raw(
@@ -224,6 +234,59 @@ builder
     });
 ```
 
+### Advanced JOINs
+
+```rust
+builder.query(|qb| {
+    qb.left_join("profiles", |join| {
+        join.on("users.id", "=", "profiles.user_id");
+    });
+    
+    qb.inner_join("departments", |join| {
+        join.on("users.department_id", "=", "departments.id");
+        join.or()
+            .on("users.role", "=", "departments.manager_role");
+    });
+    
+    qb.full_outer_join("orders", |join| {
+        join.on("users.id", "=", "orders.user_id");
+    });
+    
+    qb.cross_join("roles", |join| {
+        join.on("users.role_id", "=", "roles.id");
+    });
+    
+    qb.join_using("permissions", vec!["user_id".to_string()]);
+});
+```
+
+### Aggregate Functions and HAVING
+
+```rust
+let mut builder = ChainBuilder::new(Client::Mysql);
+builder
+    .db("mydb")
+    .table("orders")
+    .query(|qb| {
+        qb.group_by(vec!["user_id".to_string()]);
+        qb.having("COUNT(*)", ">", Value::Number(5.into()));
+        qb.having_between("SUM(amount)", [
+            Value::Number(100.into()),
+            Value::Number(1000.into())
+        ]);
+    });
+
+// Add aggregate functions
+builder
+    .select_count("id")
+    .select_sum("amount")
+    .select_avg("amount")
+    .select_max("created_at")
+    .select_min("created_at")
+    .select_alias("user_id", "uid")
+    .select_raw("CONCAT(first_name, ' ', last_name) AS full_name", None);
+```
+
 ## sqlx Integration
 
 ```rust
@@ -280,20 +343,56 @@ Used for WHERE clauses and other query parts.
 - `where_eq(column, value)` - Equal condition
 - `where_ne(column, value)` - Not equal condition
 - `where_in(column, values)` - IN condition
+- `where_not_in(column, values)` - NOT IN condition
 - `where_gt(column, value)` - Greater than
+- `where_gte(column, value)` - Greater than or equal
 - `where_lt(column, value)` - Less than
+- `where_lte(column, value)` - Less than or equal
 - `where_between(column, [min, max])` - BETWEEN condition
+- `where_not_between(column, [min, max])` - NOT BETWEEN condition
 - `where_like(column, pattern)` - LIKE condition
+- `where_not_like(column, pattern)` - NOT LIKE condition
+- `where_ilike(column, pattern)` - Case-insensitive LIKE
 - `where_null(column)` - IS NULL
+- `where_not_null(column)` - IS NOT NULL
+- `where_exists(closure)` - EXISTS subquery
+- `where_not_exists(closure)` - NOT EXISTS subquery
+- `where_column(lhs, op, rhs)` - Column-to-column comparison
+- `where_json_contains(column, value)` - JSON contains (MySQL)
 - `where_subquery(closure)` - Subquery condition
 - `or()` - Start OR chain
 - `where_raw(sql, binds)` - Raw SQL condition
+
+#### HAVING Methods
+
+- `having(column, operator, value)` - HAVING condition
+- `having_between(column, [min, max])` - HAVING BETWEEN
+- `having_in(column, values)` - HAVING IN
+- `having_not_in(column, values)` - HAVING NOT IN
+- `having_raw(sql, binds)` - Raw HAVING SQL
 
 #### JOIN Methods
 
 - `join(table, closure)` - INNER JOIN
 - `left_join(table, closure)` - LEFT JOIN
 - `right_join(table, closure)` - RIGHT JOIN
+- `left_outer_join(table, closure)` - LEFT OUTER JOIN
+- `right_outer_join(table, closure)` - RIGHT OUTER JOIN
+- `full_outer_join(table, closure)` - FULL OUTER JOIN
+- `cross_join(table, closure)` - CROSS JOIN
+- `join_using(table, columns)` - JOIN USING
+
+#### SELECT Methods
+
+- `select(select: Select)` - Basic SELECT
+- `select_raw(sql, binds)` - Raw SELECT expression
+- `select_distinct(columns)` - DISTINCT SELECT
+- `select_count(column)` - COUNT aggregate
+- `select_sum(column)` - SUM aggregate
+- `select_avg(column)` - AVG aggregate
+- `select_max(column)` - MAX aggregate
+- `select_min(column)` - MIN aggregate
+- `select_alias(column, alias)` - SELECT with alias
 - `raw_join(sql, binds)` - Raw JOIN
 
 #### Other Methods

@@ -30,6 +30,9 @@ pub trait JoinMethods {
     /// Add a CROSS JOIN clause
     fn cross_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder));
     
+    /// Add a JOIN USING clause
+    fn join_using(&mut self, table: &str, columns: Vec<String>);
+    
     /// Add a raw JOIN clause
     fn raw_join(&mut self, raw: &str, val: Option<Vec<Value>>);
 }
@@ -107,6 +110,18 @@ impl JoinMethods for QueryBuilder {
         self.join.push(join);
     }
 
+    fn cross_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
+        let mut join = JoinBuilder {
+            table: table.to_string(),
+            statement: vec![],
+            join_type: "CROSS JOIN".into(),
+            raw: None,
+            as_name: None,
+        };
+        on(&mut join);
+        self.join.push(join);
+    }
+    
     fn full_outer_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
         let mut join = JoinBuilder {
             table: table.to_string(),
@@ -118,17 +133,11 @@ impl JoinMethods for QueryBuilder {
         on(&mut join);
         self.join.push(join);
     }
-
-    fn cross_join(&mut self, table: &str, on: impl FnOnce(&mut JoinBuilder)) {
-        let mut join = JoinBuilder {
-            table: table.to_string(),
-            statement: vec![],
-            join_type: "CROSS JOIN".into(),
-            raw: None,
-            as_name: None,
-        };
-        on(&mut join);
-        self.join.push(join);
+    
+    fn join_using(&mut self, table: &str, columns: Vec<String>) {
+        let columns_str = columns.join(", ");
+        let sql = format!("JOIN {} USING ({})", table, columns_str);
+        self.raw_join(&sql, None);
     }
 
     fn raw_join(&mut self, raw: &str, val: Option<Vec<Value>>) {

@@ -50,4 +50,4 @@ pub use mysql::ToSql;
 pub use query::join::{JoinBuilder, JoinMethods};
 
 // Re-export query builder functionality
-pub use query::common::{QueryCommon, WhereClauses};
+pub use query::common::{QueryCommon, WhereClauses, HavingClauses};

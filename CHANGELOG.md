@@ -7,6 +7,29 @@
 - **Enhanced Documentation**: Added comprehensive documentation with examples and API reference
 - **Better Error Handling**: Improved error handling in statement compiler to avoid panics
 - **Type Safety**: Enhanced type safety throughout the codebase
+- **Advanced WHERE Clauses**:
+  - `where_ilike()` - Case-insensitive LIKE
+  - `where_column()` - Column-to-column comparison
+  - `where_exists()` / `where_not_exists()` - EXISTS subqueries
+  - `where_json_contains()` - JSON operations (MySQL)
+- **HAVING Clauses**:
+  - `having()` - Basic HAVING conditions
+  - `having_between()` - HAVING BETWEEN
+  - `having_in()` / `having_not_in()` - HAVING IN/NOT IN
+  - `having_raw()` - Raw HAVING SQL
+- **Aggregate Functions**:
+  - `select_count()` - COUNT aggregate
+  - `select_sum()` - SUM aggregate
+  - `select_avg()` - AVG aggregate
+  - `select_max()` - MAX aggregate
+  - `select_min()` - MIN aggregate
+  - `select_alias()` - Column aliases
+  - `select_raw()` - Raw SELECT expressions
+  - `select_distinct()` - DISTINCT SELECT
+- **Advanced JOINs**:
+  - `full_outer_join()` - FULL OUTER JOIN
+  - `cross_join()` - CROSS JOIN
+  - `join_using()` - JOIN USING
 
 ### Changed
 - **Module Organization**: 

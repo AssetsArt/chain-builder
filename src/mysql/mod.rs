@@ -25,6 +25,7 @@ pub struct ToSql {
     pub offset: Option<usize>,
     pub group_by: Vec<String>,
     pub group_by_raw: (String, Vec<Value>),
+    pub having: (String, Vec<Value>),
     pub order_by: Vec<String>,
     pub order_by_raw: (String, Vec<Value>),
 }
@@ -58,6 +59,9 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     // - group by raw
     let mut group_by_raw = String::new();
     let mut group_by_raw_binds: Vec<serde_json::Value> = vec![];
+    // - having
+    let mut having = String::new();
+    let mut having_binds: Vec<serde_json::Value> = vec![];
     // - order by
     let mut order_by: Vec<String> = vec![];
     // - order by raw
@@ -124,6 +128,15 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                     order_by_raw_binds.extend(val.clone());
                 }
             }
+            crate::types::Common::Having(sql, val) => {
+                if !having.is_empty() {
+                    having.push_str(" AND ");
+                }
+                having.push_str(sql);
+                if let Some(val) = val {
+                    having_binds.extend(val.clone());
+                }
+            }
         }
     }
 
@@ -153,6 +166,7 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
         offset,
         group_by,
         group_by_raw: (group_by_raw, group_by_raw_binds),
+        having: (having, having_binds),
         order_by,
         order_by_raw: (order_by_raw, order_by_raw_binds),
     }
@@ -202,6 +216,11 @@ pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
         select_sql.push_str(" GROUP BY ");
         select_sql.push_str(to_sql.group_by_raw.0.as_str());
         select_binds.extend(to_sql.group_by_raw.1);
+    }
+    if !to_sql.having.0.is_empty() {
+        select_sql.push_str(" HAVING ");
+        select_sql.push_str(to_sql.having.0.as_str());
+        select_binds.extend(to_sql.having.1);
     }
     if !to_sql.order_by.is_empty() {
         select_sql.push_str(" ORDER BY ");

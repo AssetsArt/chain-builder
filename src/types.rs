@@ -77,6 +77,8 @@ pub enum Common {
     GroupBy(Vec<String>),
     /// Raw GROUP BY clause
     GroupByRaw(String, Option<Vec<Value>>),
+    /// HAVING clause
+    Having(String, Option<Vec<Value>>),
     /// ORDER BY clause
     OrderBy(String, String),
     /// Raw ORDER BY clause

@@ -79,6 +79,52 @@ impl QueryCommon for QueryBuilder {
     }
 }
 
+/// Trait for HAVING clause operations
+pub trait HavingClauses {
+    /// Add a HAVING condition
+    fn having(&mut self, column: &str, operator: &str, value: Value);
+    
+    /// Add a HAVING condition with raw SQL
+    fn having_raw(&mut self, sql: &str, binds: Option<Vec<Value>>);
+    
+    /// Add a HAVING BETWEEN condition
+    fn having_between(&mut self, column: &str, values: [Value; 2]);
+    
+    /// Add a HAVING IN condition
+    fn having_in(&mut self, column: &str, values: Vec<Value>);
+    
+    /// Add a HAVING NOT IN condition
+    fn having_not_in(&mut self, column: &str, values: Vec<Value>);
+}
+
+impl HavingClauses for QueryBuilder {
+    fn having(&mut self, column: &str, operator: &str, value: Value) {
+        let sql = format!("{} {} ?", column, operator);
+        self.query_common.push(Common::Having(sql, Some(vec![value])));
+    }
+    
+    fn having_raw(&mut self, sql: &str, binds: Option<Vec<Value>>) {
+        self.query_common.push(Common::Having(sql.to_string(), binds));
+    }
+    
+    fn having_between(&mut self, column: &str, values: [Value; 2]) {
+        let sql = format!("{} BETWEEN ? AND ?", column);
+        self.query_common.push(Common::Having(sql, Some(values.to_vec())));
+    }
+    
+    fn having_in(&mut self, column: &str, values: Vec<Value>) {
+        let placeholders = vec!["?"; values.len()].join(", ");
+        let sql = format!("{} IN ({})", column, placeholders);
+        self.query_common.push(Common::Having(sql, Some(values)));
+    }
+    
+    fn having_not_in(&mut self, column: &str, values: Vec<Value>) {
+        let placeholders = vec!["?"; values.len()].join(", ");
+        let sql = format!("{} NOT IN ({})", column, placeholders);
+        self.query_common.push(Common::Having(sql, Some(values)));
+    }
+}
+
 /// Trait for WHERE clause operations
 pub trait WhereClauses {
     /// Add an equality condition
@@ -111,6 +157,9 @@ pub trait WhereClauses {
     /// Add a NOT LIKE condition
     fn where_not_like(&mut self, column: &str, value: Value);
     
+    /// Add a case-insensitive LIKE condition (ILIKE for Postgres, LOWER() for MySQL)
+    fn where_ilike(&mut self, column: &str, value: Value);
+    
     /// Add a greater than condition
     fn where_gt(&mut self, column: &str, value: Value);
     
@@ -122,6 +171,18 @@ pub trait WhereClauses {
     
     /// Add a less than or equal condition
     fn where_lte(&mut self, column: &str, value: Value);
+    
+    /// Add a column-to-column comparison
+    fn where_column(&mut self, lhs: &str, operator: &str, rhs: &str);
+    
+    /// Add an EXISTS condition
+    fn where_exists(&mut self, query: impl FnOnce(&mut crate::builder::ChainBuilder));
+    
+    /// Add a NOT EXISTS condition
+    fn where_not_exists(&mut self, query: impl FnOnce(&mut crate::builder::ChainBuilder));
+    
+    /// Add a JSON contains condition (MySQL JSON_CONTAINS)
+    fn where_json_contains(&mut self, column: &str, value: Value);
     
     /// Add a subquery condition
     fn where_subquery(&mut self, query: impl FnOnce(&mut QueryBuilder));
@@ -260,5 +321,35 @@ impl WhereClauses for QueryBuilder {
     
     fn where_raw(&mut self, sql: &str, binds: Option<Vec<Value>>) {
         self.statement.push(crate::types::Statement::Raw((sql.to_string(), binds)));
+    }
+    
+    fn where_ilike(&mut self, column: &str, value: Value) {
+        // For MySQL, use LOWER() function
+        let sql = format!("LOWER({}) LIKE LOWER(?)", column);
+        self.statement.push(crate::types::Statement::Raw((sql, Some(vec![value]))));
+    }
+    
+    fn where_column(&mut self, lhs: &str, operator: &str, rhs: &str) {
+        let sql = format!("{} {} {}", lhs, operator, rhs);
+        self.statement.push(crate::types::Statement::Raw((sql, None)));
+    }
+    
+    fn where_exists(&mut self, query: impl FnOnce(&mut crate::builder::ChainBuilder)) {
+        let mut sub_builder = crate::builder::ChainBuilder::new(crate::types::Client::Mysql);
+        query(&mut sub_builder);
+        let sql = format!("EXISTS ({})", sub_builder.to_sql().0);
+        self.statement.push(crate::types::Statement::Raw((sql, None)));
+    }
+    
+    fn where_not_exists(&mut self, query: impl FnOnce(&mut crate::builder::ChainBuilder)) {
+        let mut sub_builder = crate::builder::ChainBuilder::new(crate::types::Client::Mysql);
+        query(&mut sub_builder);
+        let sql = format!("NOT EXISTS ({})", sub_builder.to_sql().0);
+        self.statement.push(crate::types::Statement::Raw((sql, None)));
+    }
+    
+    fn where_json_contains(&mut self, column: &str, value: Value) {
+        let sql = format!("JSON_CONTAINS({}, ?)", column);
+        self.statement.push(crate::types::Statement::Raw((sql, Some(vec![value]))));
     }
 }
