@@ -17,7 +17,7 @@ fn test_sqlite_basic_select() {
     let (sql, binds) = builder.to_sql();
     println!("SQLite SELECT SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("SELECT * FROM users"));
     assert!(sql.contains("WHERE status = ?"));
     assert_eq!(binds.len(), 1);
@@ -121,10 +121,7 @@ fn test_sqlite_join() {
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
-        vec![
-            Value::Number(1.into()),
-            Value::String("John".to_string()),
-        ]
+        vec![Value::Number(1.into()), Value::String("John".to_string()),]
     );
     assert_eq!(to_sqlx.sql(), true_sql);
 }
@@ -149,10 +146,7 @@ fn test_sqlite_tow_join() {
     let to_sqlx = builder.to_sqlx_query();
     let true_sql = "SELECT * FROM mydb.users JOIN mydb.details ON details.id = users.d_id JOIN mydb.profiles ON profiles.id = users.p_id WHERE name = ?";
     assert_eq!(sql.0, true_sql);
-    assert_eq!(
-        sql.1,
-        vec![Value::String("John".to_string())]
-    );
+    assert_eq!(sql.1, vec![Value::String("John".to_string())]);
     assert_eq!(to_sqlx.sql(), true_sql);
 }
 
@@ -187,18 +181,16 @@ fn test_sqlite_join_raw() {
 #[test]
 fn test_sqlite_insert() {
     let mut builder = ChainBuilder::new(Client::Sqlite);
-    builder
-        .table("users")
-        .insert(serde_json::json!({
-            "name": "John Doe",
-            "email": "john@example.com",
-            "age": 30
-        }));
+    builder.table("users").insert(serde_json::json!({
+        "name": "John Doe",
+        "email": "john@example.com",
+        "age": 30
+    }));
 
     let (sql, binds) = builder.to_sql();
     println!("SQLite INSERT SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("INSERT INTO users"));
     assert!(sql.contains("VALUES (?, ?, ?)"));
     assert_eq!(binds.len(), 3);
@@ -207,25 +199,23 @@ fn test_sqlite_insert() {
 #[test]
 fn test_sqlite_insert_many() {
     let mut builder = ChainBuilder::new(Client::Sqlite);
-    builder
-        .table("users")
-        .insert_many(vec![
-            serde_json::json!({
-                "name": "John Doe",
-                "email": "john@example.com",
-                "age": 30
-            }),
-            serde_json::json!({
-                "name": "Jane Smith",
-                "email": "jane@example.com",
-                "age": 25
-            }),
-        ]);
+    builder.table("users").insert_many(vec![
+        serde_json::json!({
+            "name": "John Doe",
+            "email": "john@example.com",
+            "age": 30
+        }),
+        serde_json::json!({
+            "name": "Jane Smith",
+            "email": "jane@example.com",
+            "age": 25
+        }),
+    ]);
 
     let (sql, binds) = builder.to_sql();
     println!("SQLite INSERT MANY SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("INSERT INTO users"));
     assert!(sql.contains("VALUES (?, ?, ?), (?, ?, ?)"));
     assert_eq!(binds.len(), 6);
@@ -247,7 +237,7 @@ fn test_sqlite_update() {
     let (sql, binds) = builder.to_sql();
     println!("SQLite UPDATE SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("UPDATE users SET"));
     assert!(sql.contains("status = ?"));
     assert!(sql.contains("updated_at = ?"));
@@ -258,17 +248,14 @@ fn test_sqlite_update() {
 #[test]
 fn test_sqlite_delete() {
     let mut builder = ChainBuilder::new(Client::Sqlite);
-    builder
-        .table("users")
-        .delete()
-        .query(|qb| {
-            qb.where_eq("status", Value::String("deleted".to_string()));
-        });
+    builder.table("users").delete().query(|qb| {
+        qb.where_eq("status", Value::String("deleted".to_string()));
+    });
 
     let (sql, binds) = builder.to_sql();
     println!("SQLite DELETE SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("DELETE FROM users"));
     assert!(sql.contains("WHERE status = ?"));
     assert_eq!(binds.len(), 1);
@@ -380,15 +367,9 @@ fn test_sqlite_union() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql =
-        "SELECT * FROM mydb.users WHERE name = ? UNION SELECT * FROM mydb.users";
+    let true_sql = "SELECT * FROM mydb.users WHERE name = ? UNION SELECT * FROM mydb.users";
     assert_eq!(sql.0, true_sql);
-    assert_eq!(
-        sql.1,
-        vec![
-            Value::String("John".to_string()),
-        ]
-    );
+    assert_eq!(sql.1, vec![Value::String("John".to_string()),]);
     assert_eq!(to_sqlx.sql(), true_sql);
 }
 
@@ -414,15 +395,9 @@ fn test_sqlite_union_all() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql =
-        "SELECT * FROM mydb.users WHERE name = ? UNION ALL SELECT * FROM mydb.users";
+    let true_sql = "SELECT * FROM mydb.users WHERE name = ? UNION ALL SELECT * FROM mydb.users";
     assert_eq!(sql.0, true_sql);
-    assert_eq!(
-        sql.1,
-        vec![
-            Value::String("John".to_string()),
-        ]
-    );
+    assert_eq!(sql.1, vec![Value::String("John".to_string()),]);
     assert_eq!(to_sqlx.sql(), true_sql);
 }
 
@@ -550,7 +525,10 @@ fn test_sqlite_table_raw() {
 fn test_sqlite_joins() {
     let mut builder = ChainBuilder::new(Client::Sqlite);
     builder
-        .select(Select::Columns(vec!["users.name".into(), "profiles.bio".into()]))
+        .select(Select::Columns(vec![
+            "users.name".into(),
+            "profiles.bio".into(),
+        ]))
         .table("users")
         .query(|qb| {
             qb.left_join("profiles", |join| {
@@ -562,7 +540,7 @@ fn test_sqlite_joins() {
     let (sql, binds) = builder.to_sql();
     println!("SQLite JOIN SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("SELECT users.name, profiles.bio FROM users"));
     assert!(sql.contains("LEFT JOIN profiles ON users.id = profiles.user_id"));
     assert!(sql.contains("WHERE users.status = ?"));
@@ -571,13 +549,11 @@ fn test_sqlite_joins() {
 #[test]
 fn test_sqlite_aggregate_functions() {
     let mut builder = ChainBuilder::new(Client::Sqlite);
-    builder
-        .table("orders")
-        .query(|qb| {
-            qb.group_by(vec!["user_id".to_string()]);
-            qb.having("COUNT(*)", ">", Value::Number(5.into()));
-        });
-    
+    builder.table("orders").query(|qb| {
+        qb.group_by(vec!["user_id".to_string()]);
+        qb.having("COUNT(*)", ">", Value::Number(5.into()));
+    });
+
     builder
         .select_count("id")
         .select_sum("amount")
@@ -586,7 +562,7 @@ fn test_sqlite_aggregate_functions() {
     let (sql, binds) = builder.to_sql();
     println!("SQLite Aggregate SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("SELECT COUNT(id), SUM(amount), AVG(amount) FROM orders"));
     assert!(sql.contains("GROUP BY user_id"));
     assert!(sql.contains("HAVING COUNT(*) > ?"));
@@ -606,7 +582,7 @@ fn test_sqlite_limit_offset_old() {
     let (sql, binds) = builder.to_sql();
     println!("SQLite LIMIT/OFFSET SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     // SQLite uses LIMIT offset, count syntax
     assert!(sql.contains("LIMIT 20, 10"));
 }
@@ -633,7 +609,7 @@ fn test_sqlite_with_cte() {
     let (sql, binds) = builder.to_sql();
     println!("SQLite CTE SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("WITH active_users AS ("));
     assert!(sql.contains("SELECT * FROM active_users"));
 }
@@ -660,7 +636,7 @@ fn test_sqlite_union_old() {
     let (sql, binds) = builder.to_sql();
     println!("SQLite UNION SQL: {}", sql);
     println!("Binds: {:?}", binds);
-    
+
     assert!(sql.contains("UNION"));
     assert!(sql.contains("SELECT * FROM users"));
 }

@@ -5,9 +5,10 @@ use sqlx::{self, sqlite::SqliteArguments, Arguments};
 impl ChainBuilder {
     /// Build SQL + args for SQLite (use with sqlx::query_with(&sql, args))
     #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
-    pub fn to_sqlx_parts_sqlite(&mut self) -> (String, SqliteArguments<'_>) {
+    pub fn to_sqlx_parts_sqlite(&mut self) -> (String, SqliteArguments<'static>) {
         let (sql, binds) = self.to_sql();
-        let mut args = SqliteArguments::default();
+        // ระบุ lifetime ให้ชัดเจน
+        let mut args: SqliteArguments<'static> = SqliteArguments::default();
 
         for bind in binds {
             push_sqlite_arg(&mut args, bind);
@@ -18,44 +19,41 @@ impl ChainBuilder {
 }
 
 #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
-fn push_sqlite_arg(arguments: &mut SqliteArguments, v: Value) {
+fn push_sqlite_arg<'a>(arguments: &mut SqliteArguments<'a>, v: Value) {
     match v {
-        serde_json::Value::String(v) => {
-            // qb = qb.bind(v);
-            let _ = arguments.add(v);
+        Value::Null => {
+            // bind NULL อย่างชัดเจน
+            let _ = arguments.add(Option::<String>::None);
         }
-        serde_json::Value::Number(v) => {
-            if v.is_f64() {
-                // qb = qb.bind(v.as_f64().unwrap_or(0.0));
-                let _ = arguments.add(v.as_f64().unwrap_or(0.0));
-            } else if v.is_u64() {
-                // qb = qb.bind(v.as_u64().unwrap_or(0));
-                let _ = arguments.add(v.as_u64().unwrap_or(0) as i64);
-            } else if v.is_i64() {
-                // qb = qb.bind(v.as_i64().unwrap_or(0));
-                let _ = arguments.add(v.as_i64().unwrap_or(0));
+        Value::Bool(b) => {
+            let _ = arguments.add(b);
+        }
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                let _ = arguments.add(i);
+            } else if let Some(u) = n.as_u64() {
+                if u <= i64::MAX as u64 {
+                    let _ = arguments.add(u as i64);
+                } else {
+                    // ถ้าใหญ่เกิน เก็บเป็น string ปลอดภัยสุด
+                    let _ = arguments.add(u.to_string());
+                }
+            } else if let Some(f) = n.as_f64() {
+                let _ = arguments.add(f);
             } else {
-                // qb = qb.bind(v.to_string());
-                let _ = arguments.add(v.to_string());
+                let _ = arguments.add(n.to_string());
             }
         }
-        serde_json::Value::Bool(v) => {
-            // qb = qb.bind(v);
-            let _ = arguments.add(v);
+        Value::String(s) => {
+            let _ = arguments.add(s);
         }
-        serde_json::Value::Null => {
-            let null_data: Option<Value> = None;
-            // qb = qb.bind(null_data);
-            let _ = arguments.add(null_data);
+        Value::Array(arr) => {
+            // SQLite ไม่มี array type → เก็บเป็น JSON text
+            let _ = arguments.add(serde_json::to_string(&arr).unwrap_or_default());
         }
-        serde_json::Value::Object(v) => {
-            let to_string = serde_json::to_string(&v).unwrap_or_default();
-            // qb = qb.bind(to_string);
-            let _ = arguments.add(to_string);
-        }
-        _ => {
-            // qb = qb.bind(bind);
-            let _ = arguments.add(v);
+        Value::Object(obj) => {
+            // เก็บเป็น JSON text
+            let _ = arguments.add(serde_json::to_string(&obj).unwrap_or_default());
         }
     }
 }
