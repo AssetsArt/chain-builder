@@ -1,23 +1,22 @@
+//! SQLite-specific compilation logic
+
+use crate::builder::ChainBuilder;
 use serde_json::Value;
 
-// inner
-use crate::{
-    builder::ChainBuilder,
-    common::{
-        join_compiler::join_compiler,
-        method_compiler::{method_compiler_with_provider, ToSqlProvider},
-        statement_compiler::statement_compiler,
-    },
-};
+// Re-export compilation functions from common
+pub use crate::common::join_compiler::join_compiler;
+pub use crate::common::method_compiler::{method_compiler_with_provider, ToSqlProvider};
+pub use crate::common::statement_compiler::statement_compiler;
 
-struct MySqlToSqlProvider;
+struct SqliteToSqlProvider;
 
-impl ToSqlProvider for MySqlToSqlProvider {
+impl ToSqlProvider for SqliteToSqlProvider {
     fn to_sql(&self, chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
         merge_to_sql(to_sql(chain_builder))
     }
 }
 
+/// SQLite compilation result structure
 #[derive(Debug, Clone, Default)]
 pub struct ToSql {
     pub statement: (String, Vec<Value>),
@@ -35,79 +34,74 @@ pub struct ToSql {
     pub order_by_raw: (String, Vec<Value>),
 }
 
+/// Main SQLite compilation function
 pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
-    // statement compiler
-    let mut statement = statement_compiler(chain_builder);
-    if !statement.0.is_empty() {
-        statement.0 = format!("WHERE {}", statement.0);
-    }
-    // compiler method
-    let method = method_compiler_with_provider(chain_builder, &MySqlToSqlProvider);
-    // join compiler
+    // Compile different parts
+    let statement = statement_compiler(chain_builder);
+    let method = method_compiler_with_provider(chain_builder, &SqliteToSqlProvider);
     let join = join_compiler(chain_builder, true);
+    let _raw = (String::new(), Vec::<Value>::new());
 
-    // QueryCommon
-    // - with
+    // Process common clauses
     let mut with = String::new();
     let mut with_binds: Vec<serde_json::Value> = vec![];
-    let mut is_first_with = true;
-    //  - union
     let mut sql_union = String::new();
     let mut sql_union_binds: Vec<serde_json::Value> = vec![];
-    let mut is_first_union = true;
-    // - limit
-    let mut limit = None;
-    // - offset
-    let mut offset = None;
-    // - group by
+    let mut limit: Option<usize> = None;
+    let mut offset: Option<usize> = None;
     let mut group_by: Vec<String> = vec![];
-    // - group by raw
     let mut group_by_raw = String::new();
     let mut group_by_raw_binds: Vec<serde_json::Value> = vec![];
-    // - having
     let mut having = String::new();
     let mut having_binds: Vec<serde_json::Value> = vec![];
-    // - order by
     let mut order_by: Vec<String> = vec![];
-    // - order by raw
     let mut order_by_raw = String::new();
     let mut order_by_raw_binds: Vec<serde_json::Value> = vec![];
 
+    // Process raw statements
+    let mut raw_sql = String::new();
+    let mut raw_binds: Vec<serde_json::Value> = vec![];
+    for (sql, binds) in chain_builder.query.raw.iter() {
+        if !raw_sql.is_empty() {
+            raw_sql.push(' ');
+        }
+        raw_sql.push_str(sql);
+        if let Some(binds) = binds {
+            raw_binds.extend(binds.clone());
+        }
+    }
+
+    // Process common clauses
     for common in chain_builder.query.query_common.iter() {
         match common {
             crate::types::Common::With(alias, recursive, chain_builder) => {
-                with.push_str("WITH");
-                with.push(' ');
-                if !is_first_with {
+                if with.is_empty() {
+                    with.push_str("WITH ");
+                } else {
                     with.push_str(", ");
                 }
-                is_first_with = false;
                 if *recursive {
-                    with.push_str("RECURSIVE");
-                    with.push(' ');
+                    with.push_str("RECURSIVE ");
                 }
-                with.push_str(alias.as_str());
+                with.push_str(alias);
                 with.push_str(" AS (");
-                let sql = merge_to_sql(to_sql(chain_builder));
-                with.push_str(sql.0.as_str());
-                with.push(')');
-                with_binds.extend(sql.1);
-                with.push(' ');
+                let sql = to_sql(chain_builder);
+                with.push_str(&sql.method.0);
+                with_binds.extend(sql.method.1);
+                with.push_str(")");
             }
             crate::types::Common::Union(is_all, chain_builder) => {
-                if !is_first_union {
+                if !sql_union.is_empty() {
                     sql_union.push(' ');
                 }
-                is_first_union = false;
                 if *is_all {
-                    sql_union.push_str("UNION ALL");
+                    sql_union.push_str("UNION ALL ");
                 } else {
-                    sql_union.push_str("UNION");
+                    sql_union.push_str("UNION ");
                 }
-                sql_union.push(' ');
-                let sql = merge_to_sql(to_sql(chain_builder));
-                sql_union.push_str(sql.0.as_str());
-                sql_union_binds.extend(sql.1);
+                let sql = to_sql(chain_builder);
+                sql_union.push_str(sql.method.0.as_str());
+                sql_union_binds.extend(sql.method.1);
             }
             crate::types::Common::Limit(l) => {
                 limit = Some(*l);
@@ -124,15 +118,6 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                     group_by_raw_binds.extend(b.clone());
                 }
             }
-            crate::types::Common::OrderBy(column, order) => {
-                order_by.push(format!("{} {}", column, order));
-            }
-            crate::types::Common::OrderByRaw(sql, val) => {
-                order_by_raw.push_str(sql.as_str());
-                if let Some(val) = val {
-                    order_by_raw_binds.extend(val.clone());
-                }
-            }
             crate::types::Common::Having(sql, val) => {
                 if !having.is_empty() {
                     having.push_str(" AND ");
@@ -142,20 +127,14 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                     having_binds.extend(val.clone());
                 }
             }
-        }
-    }
-
-    // raw compiler
-    let mut raw_sql = String::new();
-    let mut raw_binds: Vec<serde_json::Value> = vec![];
-    if !chain_builder.query.raw.is_empty() {
-        for (i, raw) in chain_builder.query.raw.iter().enumerate() {
-            if i > 0 {
-                raw_sql.push(' ');
+            crate::types::Common::OrderBy(column, order) => {
+                order_by.push(format!("{} {}", column, order));
             }
-            raw_sql.push_str(&raw.0);
-            if let Some(binds) = &raw.1 {
-                raw_binds.extend(binds.clone());
+            crate::types::Common::OrderByRaw(sql, val) => {
+                order_by_raw.push_str(sql.as_str());
+                if let Some(val) = val {
+                    order_by_raw_binds.extend(val.clone());
+                }
             }
         }
     }
@@ -177,84 +156,87 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     }
 }
 
+/// Merge compilation results into final SQL
 pub fn merge_to_sql(to_sql: ToSql) -> (String, Vec<Value>) {
     let mut select_sql = String::new();
     let mut select_binds: Vec<serde_json::Value> = vec![];
 
-    // Add all order by
-    // - with,
-    // - method
-    // - join
-    // - statement
-    // - limit
-    // - group by
-    // - group by raw
-    // - order by
-    // - order by raw
-    // - offset
-    // - union
-    // - raw
-
+    // Add WITH clause
     if !to_sql.sql_with.0.is_empty() {
-        select_sql.push_str(to_sql.sql_with.0.as_str());
+        select_sql.push_str(&to_sql.sql_with.0);
         select_binds.extend(to_sql.sql_with.1);
     }
-    if !to_sql.method.0.is_empty() {
-        select_sql.push_str(to_sql.method.0.as_str());
-        select_binds.extend(to_sql.method.1);
-    }
+
+    // Add main query
+    select_sql.push_str(&to_sql.method.0);
+    select_binds.extend(to_sql.method.1);
+
+    // Add JOINs
     if !to_sql.join.0.is_empty() {
         select_sql.push(' ');
-        select_sql.push_str(to_sql.join.0.as_str());
+        select_sql.push_str(&to_sql.join.0);
         select_binds.extend(to_sql.join.1);
     }
+
+    // Add WHERE clause
     if !to_sql.statement.0.is_empty() {
-        select_sql.push(' ');
-        select_sql.push_str(to_sql.statement.0.as_str());
+        select_sql.push_str(" WHERE ");
+        select_sql.push_str(&to_sql.statement.0.trim());
         select_binds.extend(to_sql.statement.1);
     }
+
+    // Add raw SQL
+    if !to_sql.raw.0.is_empty() {
+        select_sql.push(' ');
+        select_sql.push_str(&to_sql.raw.0);
+        select_binds.extend(to_sql.raw.1);
+    }
+
+    // Add GROUP BY
     if !to_sql.group_by.is_empty() {
         select_sql.push_str(" GROUP BY ");
-        select_sql.push_str(to_sql.group_by.join(", ").as_str());
+        select_sql.push_str(&to_sql.group_by.join(", "));
     }
     if !to_sql.group_by_raw.0.is_empty() {
         select_sql.push_str(" GROUP BY ");
-        select_sql.push_str(to_sql.group_by_raw.0.as_str());
+        select_sql.push_str(&to_sql.group_by_raw.0);
         select_binds.extend(to_sql.group_by_raw.1);
     }
+
+    // Add HAVING
     if !to_sql.having.0.is_empty() {
         select_sql.push_str(" HAVING ");
-        select_sql.push_str(to_sql.having.0.as_str());
+        select_sql.push_str(&to_sql.having.0);
         select_binds.extend(to_sql.having.1);
     }
+
+    // Add ORDER BY
     if !to_sql.order_by.is_empty() {
         select_sql.push_str(" ORDER BY ");
-        select_sql.push_str(to_sql.order_by.join(", ").as_str());
+        select_sql.push_str(&to_sql.order_by.join(", "));
     }
     if !to_sql.order_by_raw.0.is_empty() {
         select_sql.push_str(" ORDER BY ");
-        select_sql.push_str(to_sql.order_by_raw.0.as_str());
+        select_sql.push_str(&to_sql.order_by_raw.0);
         select_binds.extend(to_sql.order_by_raw.1);
     }
-    if let Some(limit) = to_sql.limit {
-        select_sql.push(' ');
-        select_sql.push_str("LIMIT ?");
-        select_binds.push(serde_json::Value::Number(serde_json::Number::from(limit)));
+
+    // Add LIMIT and OFFSET (SQLite uses LIMIT offset, count)
+    if let Some(limit_val) = to_sql.limit {
+        if let Some(offset_val) = to_sql.offset {
+            select_sql.push_str(&format!(" LIMIT {}, {}", offset_val, limit_val));
+        } else {
+            select_sql.push_str(&format!(" LIMIT {}", limit_val));
+        }
+    } else if let Some(offset_val) = to_sql.offset {
+        select_sql.push_str(&format!(" LIMIT {}, -1", offset_val));
     }
-    if let Some(offset) = to_sql.offset {
-        select_sql.push(' ');
-        select_sql.push_str("OFFSET ?");
-        select_binds.push(serde_json::Value::Number(serde_json::Number::from(offset)));
-    }
+
+    // Add UNION
     if !to_sql.sql_union.0.is_empty() {
         select_sql.push(' ');
-        select_sql.push_str(to_sql.sql_union.0.as_str());
+        select_sql.push_str(&to_sql.sql_union.0);
         select_binds.extend(to_sql.sql_union.1);
-    }
-    if !to_sql.raw.0.is_empty() {
-        select_sql.push(' ');
-        select_sql.push_str(to_sql.raw.0.as_str());
-        select_binds.extend(to_sql.raw.1);
     }
 
     (select_sql, select_binds)

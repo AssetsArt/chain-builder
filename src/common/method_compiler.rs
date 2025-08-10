@@ -1,10 +1,19 @@
-use super::{merge_to_sql, to_sql};
-use crate::{ChainBuilder, Method, Select};
+use crate::{
+    builder::ChainBuilder,
+    types::{Method, Select},
+};
 use serde_json::Value;
 
-pub fn method_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
+pub trait ToSqlProvider {
+    fn to_sql(&self, chain_builder: &ChainBuilder) -> (String, Vec<Value>);
+}
+
+pub fn method_compiler_with_provider<T: ToSqlProvider>(
+    chain_builder: &ChainBuilder,
+    to_sql_provider: &T,
+) -> (String, Vec<Value>) {
     match chain_builder.method {
-        Method::Select => select_compiler(chain_builder),
+        Method::Select => select_compiler(chain_builder, to_sql_provider),
         Method::Insert => insert_into_compiler(chain_builder),
         Method::InsertMany => insert_many_compiler(chain_builder),
         Method::Update => update_compiler(chain_builder),
@@ -57,7 +66,6 @@ fn insert_into_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
             insert_sql.push_str(", ");
         }
         insert_sql.push('?');
-        // insert_binds.push(data.get(key.as_str()).unwrap().clone());
         match data.get(key.as_str()) {
             Some(value) => {
                 insert_binds.push(value.clone());
@@ -65,7 +73,6 @@ fn insert_into_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
             None => {
                 println!("[Err] key: {:?}", key);
                 println!("[Err] data: {:?}", data);
-                // Should not happen
                 panic!("[Err] insert_into_compiler: data.get(key.as_str()) is None");
             }
         }
@@ -142,7 +149,6 @@ fn insert_many_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
                 None => {
                     println!("[Err] key: {:?}", key);
                     println!("[Err] row: {:?}", row);
-                    // Should not happen
                     panic!("[Err] insert_many_compiler: row.get(key.as_str()) is None");
                 }
             }
@@ -153,8 +159,11 @@ fn insert_many_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
     (insert_sql, insert_binds)
 }
 
-// Select
-fn select_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
+// Select with provider
+fn select_compiler<T: ToSqlProvider>(
+    chain_builder: &ChainBuilder,
+    to_sql_provider: &T,
+) -> (String, Vec<Value>) {
     let mut select_sql = String::new();
     let mut select_binds: Vec<serde_json::Value> = vec![];
     if chain_builder.is_distinct {
@@ -184,13 +193,12 @@ fn select_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
                     }
                 }
                 Select::Builder(as_name, c2) => {
-                    let rs_tosql = to_sql(c2);
-                    let rs_sql = merge_to_sql(rs_tosql);
-                    select_sql.push('(');
-                    select_sql.push_str(rs_sql.0.as_str());
+                    let (sub_sql, sub_binds) = to_sql_provider.to_sql(c2);
+                    select_sql.push_str("(");
+                    select_sql.push_str(&sub_sql);
                     select_sql.push_str(") AS ");
                     select_sql.push_str(as_name.as_str());
-                    select_binds.extend(rs_sql.1);
+                    select_binds.extend(sub_binds);
                 }
             }
         }
@@ -257,7 +265,6 @@ fn update_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {
             None => {
                 println!("[Err] key: {:?}", key);
                 println!("[Err] data: {:?}", data);
-                // Should not happen
                 panic!("[Err] update_compiler: data.get(key.as_str()) is None");
             }
         }

@@ -1,54 +1,53 @@
-use crate::ChainBuilder;
+use crate::builder::ChainBuilder;
 use serde_json::Value;
 use sqlx::{self, mysql::MySqlArguments, Arguments, Row};
 
 impl ChainBuilder {
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     fn value_to_arguments(&self, binds: &Vec<Value>) -> MySqlArguments {
         let mut arguments: MySqlArguments = MySqlArguments::default();
         for bind in binds {
             match bind {
-                serde_json::Value::String(v) => {
-                    // qb = qb.bind(v);
-                    let _ = arguments.add(v);
+                Value::Null => {
+                    // bind NULL อย่างชัดเจน
+                    let _ = arguments.add(Option::<String>::None);
                 }
-                serde_json::Value::Number(v) => {
-                    if v.is_f64() {
-                        // qb = qb.bind(v.as_f64().unwrap_or(0.0));
-                        let _ = arguments.add(v.as_f64().unwrap_or(0.0));
-                    } else if v.is_u64() {
-                        // qb = qb.bind(v.as_u64().unwrap_or(0));
-                        let _ = arguments.add(v.as_u64().unwrap_or(0));
-                    } else if v.is_i64() {
-                        // qb = qb.bind(v.as_i64().unwrap_or(0));
-                        let _ = arguments.add(v.as_i64().unwrap_or(0));
+                Value::Bool(b) => {
+                    let _ = arguments.add(b);
+                }
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        let _ = arguments.add(i);
+                    } else if let Some(u) = n.as_u64() {
+                        if u <= i64::MAX as u64 {
+                            let _ = arguments.add(u as i64);
+                        } else {
+                            // ถ้าใหญ่เกิน เก็บเป็น string ปลอดภัยสุด
+                            let _ = arguments.add(u.to_string());
+                        }
+                    } else if let Some(f) = n.as_f64() {
+                        let _ = arguments.add(f);
                     } else {
-                        // qb = qb.bind(v.to_string());
-                        let _ = arguments.add(v.to_string());
+                        let _ = arguments.add(n.to_string());
                     }
                 }
-                serde_json::Value::Bool(v) => {
-                    // qb = qb.bind(v);
-                    let _ = arguments.add(v);
+                Value::String(s) => {
+                    let _ = arguments.add(s);
                 }
-                serde_json::Value::Null => {
-                    let null_data: Option<Value> = None;
-                    // qb = qb.bind(null_data);
-                    let _ = arguments.add(null_data);
+                Value::Array(arr) => {
+                    // SQLite ไม่มี array type → เก็บเป็น JSON text
+                    let _ = arguments.add(serde_json::to_string(&arr).unwrap_or_default());
                 }
-                serde_json::Value::Object(v) => {
-                    let to_string = serde_json::to_string(&v).unwrap_or_default();
-                    // qb = qb.bind(to_string);
-                    let _ = arguments.add(to_string);
-                }
-                _ => {
-                    // qb = qb.bind(bind);
-                    let _ = arguments.add(bind);
+                Value::Object(obj) => {
+                    // เก็บเป็น JSON text
+                    let _ = arguments.add(serde_json::to_string(&obj).unwrap_or_default());
                 }
             }
         }
         arguments
     }
 
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub fn to_sqlx_query(
         &mut self,
     ) -> sqlx::query::Query<'_, sqlx::MySql, sqlx::mysql::MySqlArguments> {
@@ -56,6 +55,7 @@ impl ChainBuilder {
         sqlx::query_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
     }
 
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub fn to_sqlx_query_as<T>(
         &mut self,
     ) -> sqlx::query::QueryAs<'_, sqlx::MySql, T, sqlx::mysql::MySqlArguments>
@@ -66,6 +66,7 @@ impl ChainBuilder {
         sqlx::query_as_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
     }
 
+    #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
     pub async fn count(
         &mut self,
         column: &str,
