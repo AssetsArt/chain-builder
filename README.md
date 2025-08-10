@@ -4,12 +4,13 @@
 [![Version](https://img.shields.io/crates/v/chain-builder?style=for-the-badge)](https://crates.io/crates/chain-builder)
 [![License](https://img.shields.io/crates/l/chain-builder?style=for-the-badge)](https://crates.io/crates/chain-builder)
 
-A flexible and easy-to-use query builder for MySQL in Rust. This library provides a fluent interface for building SQL queries with support for complex operations like JOINs, CTEs, and subqueries.
+A flexible and easy-to-use query builder for MySQL and SQLite in Rust. This library provides a fluent interface for building SQL queries with support for complex operations like JOINs, CTEs, and subqueries.
 
 ## Features
 
 - **Fluent API**: Chain methods for intuitive query building
 - **Type Safety**: Compile-time safety with Rust's type system
+- **Multi-Database Support**: MySQL and SQLite with dedicated compilers
 - **Complex Queries**: Support for JOINs, CTEs, UNIONs, and subqueries
 - **Advanced WHERE Clauses**: EXISTS, NOT EXISTS, ILIKE, column comparisons, JSON operations
 - **HAVING Clauses**: Support for aggregate function filtering
@@ -18,6 +19,7 @@ A flexible and easy-to-use query builder for MySQL in Rust. This library provide
 - **Raw SQL**: Fallback to raw SQL when needed
 - **Multiple Operations**: SELECT, INSERT, UPDATE, DELETE
 - **sqlx Integration**: Direct integration with sqlx for async database operations
+- **Modern Architecture**: Clean, modular codebase with better maintainability
 
 ## Installation
 
@@ -25,19 +27,37 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-chain-builder = "0.1.25"
+chain-builder = "1.0.0"
 serde_json = "1.0"
 ```
 
-For sqlx integration:
+For MySQL with sqlx integration:
 
 ```toml
 [dependencies]
-chain-builder = { version = "0.1.25", features = ["sqlx_mysql"] }
+chain-builder = { version = "1.0.0", features = ["sqlx_mysql"] }
 sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-rustls"] }
 ```
 
+For SQLite with sqlx integration:
+
+```toml
+[dependencies]
+chain-builder = { version = "1.0.0", features = ["sqlx_sqlite"] }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
+```
+
+For full features (MySQL + SQLite):
+
+```toml
+[dependencies]
+chain-builder = { version = "1.0.0", features = ["full"] }
+sqlx = { version = "0.8", features = ["mysql", "sqlite", "runtime-tokio-rustls"] }
+```
+
 ## Quick Start
+
+### MySQL Example
 
 ```rust
 use chain_builder::{ChainBuilder, Client, Select};
@@ -153,7 +173,7 @@ builder.query(|qb| {
             });
     });
     
-    // JSON contains
+    // JSON contains (MySQL only)
     qb.where_json_contains("metadata", Value::String("premium".to_string()));
     
     // Raw SQL
@@ -383,6 +403,8 @@ The main query builder class.
 #### Methods
 
 - `new(client: Client)` - Create a new builder
+- `new_mysql()` - Create a new MySQL builder
+- `new_sqlite()` - Create a new SQLite builder
 - `db(name: &str)` - Set database name
 - `table(name: &str)` - Set table name
 - `select(select: Select)` - Add SELECT clause
@@ -391,6 +413,18 @@ The main query builder class.
 - `delete()` - Set DELETE operation
 - `query(closure)` - Configure WHERE, JOIN, etc.
 - `to_sql()` - Generate SQL string and bind parameters
+
+#### SELECT Methods
+
+- `select(select: Select)` - Basic SELECT
+- `select_raw(sql, binds)` - Raw SELECT expression
+- `select_distinct(columns)` - DISTINCT SELECT
+- `select_count(column)` - COUNT aggregate
+- `select_sum(column)` - SUM aggregate
+- `select_avg(column)` - AVG aggregate
+- `select_max(column)` - MAX aggregate
+- `select_min(column)` - MIN aggregate
+- `select_alias(column, alias)` - SELECT with alias
 
 ### QueryBuilder
 
@@ -440,19 +474,6 @@ Used for WHERE clauses and other query parts.
 - `cross_join(table, closure)` - CROSS JOIN
 - `join_using(table, columns)` - JOIN USING
 
-#### SELECT Methods
-
-- `select(select: Select)` - Basic SELECT
-- `select_raw(sql, binds)` - Raw SELECT expression
-- `select_distinct(columns)` - DISTINCT SELECT
-- `select_count(column)` - COUNT aggregate
-- `select_sum(column)` - SUM aggregate
-- `select_avg(column)` - AVG aggregate
-- `select_max(column)` - MAX aggregate
-- `select_min(column)` - MIN aggregate
-- `select_alias(column, alias)` - SELECT with alias
-- `raw_join(sql, binds)` - Raw JOIN
-
 #### Other Methods
 
 - `limit(n)` - LIMIT clause
@@ -461,6 +482,21 @@ Used for WHERE clauses and other query parts.
 - `group_by(columns)` - GROUP BY
 - `with(alias, builder)` - WITH clause
 - `union(builder)` - UNION clause
+
+## Architecture
+
+The library is organized into several modules:
+
+- **`src/types.rs`** - Core types and enums
+- **`src/builder.rs`** - Main ChainBuilder implementation
+- **`src/query/`** - Query building functionality
+  - **`src/query/common.rs`** - Common query operations (WHERE, HAVING, etc.)
+  - **`src/query/join/`** - JOIN functionality
+- **`src/common/`** - Shared compilation logic
+- **`src/mysql/`** - MySQL-specific compilation
+- **`src/sqlite/`** - SQLite-specific compilation
+- **`src/sqlx_mysql.rs`** - MySQL sqlx integration
+- **`src/sqlx_sqlite.rs`** - SQLite sqlx integration
 
 ## License
 
