@@ -8,7 +8,7 @@ use serde_json::Value;
 // inner
 use crate::{
     mysql::{method_compiler::method_compiler, statement_compiler::statement_compiler},
-    ChainBuilder,
+    builder::ChainBuilder,
 };
 
 use self::join_compiler::join_compiler;
@@ -66,7 +66,7 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
 
     for common in chain_builder.query.query_common.iter() {
         match common {
-            crate::Common::With(alias, recursive, chain_builder) => {
+            crate::types::Common::With(alias, recursive, chain_builder) => {
                 with.push_str("WITH");
                 with.push(' ');
                 if !is_first_with {
@@ -85,7 +85,7 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                 with_binds.extend(sql.1);
                 with.push(' ');
             }
-            crate::Common::Union(is_all, chain_builder) => {
+            crate::types::Common::Union(is_all, chain_builder) => {
                 if !is_first_union {
                     sql_union.push(' ');
                 }
@@ -100,25 +100,25 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                 sql_union.push_str(sql.0.as_str());
                 sql_union_binds.extend(sql.1);
             }
-            crate::Common::Limit(l) => {
+            crate::types::Common::Limit(l) => {
                 limit = Some(*l);
             }
-            crate::Common::Offset(o) => {
+            crate::types::Common::Offset(o) => {
                 offset = Some(*o);
             }
-            crate::Common::GroupBy(g) => {
+            crate::types::Common::GroupBy(g) => {
                 group_by.extend(g.clone());
             }
-            crate::Common::GroupByRaw(g, b) => {
+            crate::types::Common::GroupByRaw(g, b) => {
                 group_by_raw.push_str(g.as_str());
                 if let Some(b) = b {
                     group_by_raw_binds.extend(b.clone());
                 }
             }
-            crate::Common::OrderBy(column, order) => {
+            crate::types::Common::OrderBy(column, order) => {
                 order_by.push(format!("{} {}", column, order));
             }
-            crate::Common::OrderByRaw(sql, val) => {
+            crate::types::Common::OrderByRaw(sql, val) => {
                 order_by_raw.push_str(sql.as_str());
                 if let Some(val) = val {
                     order_by_raw_binds.extend(val.clone());

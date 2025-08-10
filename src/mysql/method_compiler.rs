@@ -1,5 +1,5 @@
 use super::{merge_to_sql, to_sql};
-use crate::{ChainBuilder, Method, Select};
+use crate::{builder::ChainBuilder, types::{Method, Select}};
 use serde_json::Value;
 
 pub fn method_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) {

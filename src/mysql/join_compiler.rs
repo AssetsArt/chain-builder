@@ -1,4 +1,4 @@
-use crate::{join::JoinStatement, ChainBuilder};
+use crate::{query::join::JoinStatement, builder::ChainBuilder};
 use serde_json::Value;
 
 pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec<Value>) {

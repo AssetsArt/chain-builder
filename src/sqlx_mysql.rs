@@ -1,4 +1,4 @@
-use crate::ChainBuilder;
+use crate::builder::ChainBuilder;
 use serde_json::Value;
 use sqlx::{self, mysql::MySqlArguments, Arguments, Row};
 

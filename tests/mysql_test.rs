@@ -22,15 +22,15 @@ fn test_chain_builder() {
 
             qb.where_subquery(|sub| {
                 sub.where_eq("status", Value::String("active".to_string()));
-                sub.or()
-                    .where_eq("status", Value::String("pending".to_string()))
-                    .where_between(
-                        "registered_at",
-                        [
-                            Value::String("2024-01-01".to_string()),
-                            Value::String("2024-01-31".to_string()),
-                        ],
-                    );
+                let or_sub = sub.or();
+                or_sub.where_eq("status", Value::String("pending".to_string()));
+                or_sub.where_between(
+                    "registered_at",
+                    [
+                        Value::String("2024-01-01".to_string()),
+                        Value::String("2024-01-31".to_string()),
+                    ],
+                );
             });
 
             qb.where_raw(
@@ -471,7 +471,8 @@ fn test_limit_offset() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
-            qb.limit(10).offset(5);
+            qb.limit(10);
+            qb.offset(5);
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
@@ -497,8 +498,9 @@ fn test_group_by() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
-            qb.limit(10).offset(5);
-            qb.group_by(vec!["name", "city"]);
+            qb.limit(10);
+            qb.offset(5);
+            qb.group_by(vec!["name".to_string(), "city".to_string()]);
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
@@ -524,7 +526,8 @@ fn test_group_by_raw() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
-            qb.limit(10).offset(5);
+            qb.limit(10);
+            qb.offset(5);
             qb.group_by_raw("name, city", None);
         });
     let sql = builder.to_sql();
@@ -551,7 +554,8 @@ fn test_order_by() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
-            qb.limit(10).offset(5);
+            qb.limit(10);
+            qb.offset(5);
             qb.order_by("name", "ASC");
             qb.order_by("city", "DESC");
         });
@@ -580,7 +584,8 @@ fn test_order_by_raw() {
         .table("users")
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
-            qb.limit(10).offset(5);
+            qb.limit(10);
+            qb.offset(5);
             qb.order_by_raw("`count`, `name` order by (`name` is not null) desc", None);
         });
     let sql = builder.to_sql();
@@ -612,7 +617,8 @@ fn test_table_raw() {
         .query(|qb| {
             qb.where_eq("name", Value::String("John".to_string()));
             qb.where_gt("count", Value::Number(10.into()));
-            qb.limit(10).offset(5);
+            qb.limit(10);
+            qb.offset(5);
             qb.order_by_raw("`count`, `name` order by (`name` is not null) desc", None);
         });
     let sql = builder.to_sql();

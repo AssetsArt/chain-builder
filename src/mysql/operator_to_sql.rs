@@ -1,4 +1,4 @@
-use crate::Operator;
+use crate::query::Operator;
 
 // operator and is_bind
 pub fn operator_to_sql(operator: &Operator) -> (&str, bool) {
