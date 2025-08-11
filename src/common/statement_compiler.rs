@@ -7,6 +7,22 @@ pub fn statement_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) 
     let mut is_first = true;
     let mut build_statement = |statement: &Statement| match statement {
         Statement::Value(field, operator, value) => {
+            if (*operator == Operator::In || *operator == Operator::NotIn)
+                && matches!(value, Value::Array(arr) if arr.is_empty())
+            {
+                if is_first {
+                    is_first = false;
+                } else {
+                    statement_sql.push_str(" AND ");
+                }
+                statement_sql.push_str(if *operator == Operator::In {
+                    "1 = 0"
+                } else {
+                    "1 = 1"
+                });
+                return;
+            }
+
             let (operator_str, is_bind) = super::operator_to_sql::operator_to_sql(operator);
             if is_first {
                 is_first = false;
@@ -26,18 +42,18 @@ pub fn statement_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) 
                 statement_sql.push_str(operator_str);
                 if is_bind {
                     if *operator == Operator::In || *operator == Operator::NotIn {
-                        if let serde_json::Value::Array(value) = value {
+                        if let Value::Array(value) = value {
                             statement_sql.push_str(" (");
-                            let mut is_first = true;
-                            value.iter().for_each(|v| {
-                                if is_first {
-                                    is_first = false;
+                            let mut first = true;
+                            for v in value {
+                                if first {
+                                    first = false;
                                 } else {
                                     statement_sql.push(',');
                                 }
                                 statement_sql.push('?');
                                 statement_binds.push(v.clone());
-                            });
+                            }
                             statement_sql.push(')');
                         } else {
                             statement_sql.push_str(" ?");

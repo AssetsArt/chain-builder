@@ -38,6 +38,7 @@ pub struct ChainBuilder {
 impl ChainBuilder {
     /// Create a new ChainBuilder with the specified client
     pub fn new(client: Client) -> ChainBuilder {
+        let query = QueryBuilder::new(client.clone());
         ChainBuilder {
             client,
             table: None,
@@ -45,7 +46,7 @@ impl ChainBuilder {
             select: Vec::new(),
             as_name: None,
             db: None,
-            query: QueryBuilder::default(),
+            query,
             method: Method::Select,
             insert_update: Value::Null,
             sql_str: String::new(),
