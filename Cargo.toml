@@ -1,6 +1,6 @@
 [package]
 name = "chain-builder"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "A query builder for MySQL for Rust is designed to be flexible and easy to use."
 license = "MIT"
