@@ -3,11 +3,11 @@
 pub mod common;
 pub mod join;
 
-use crate::types::{Common, Statement};
+use crate::types::{Client, Common, Statement};
 use serde_json::Value;
 
 /// Main query builder for constructing WHERE clauses and other query parts
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct QueryBuilder {
     /// WHERE clause statements
     pub(crate) statement: Vec<Statement>,
@@ -17,6 +17,27 @@ pub struct QueryBuilder {
     pub(crate) join: Vec<join::JoinBuilder>,
     /// Common clauses (WITH, UNION, LIMIT, etc.)
     pub(crate) query_common: Vec<Common>,
+    /// Database client type used for nested builders
+    pub(crate) client: Client,
+}
+
+impl QueryBuilder {
+    /// Create a new QueryBuilder for the specified client
+    pub fn new(client: Client) -> Self {
+        Self {
+            statement: Vec::new(),
+            raw: Vec::new(),
+            join: Vec::new(),
+            query_common: Vec::new(),
+            client,
+        }
+    }
+}
+
+impl Default for QueryBuilder {
+    fn default() -> Self {
+        Self::new(Client::Mysql)
+    }
 }
 
 /// SQL comparison operators

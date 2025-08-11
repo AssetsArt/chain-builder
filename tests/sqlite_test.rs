@@ -24,6 +24,53 @@ fn test_sqlite_basic_select() {
 }
 
 #[test]
+fn test_sqlite_empty_in_conditions() {
+    let mut builder = ChainBuilder::new(Client::Sqlite);
+    builder
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_in("id", vec![]);
+        });
+    let sql = builder.to_sql();
+    assert!(sql.0.contains("1 = 0"));
+}
+
+#[test]
+fn test_sqlite_having_empty_in() {
+    let mut builder = ChainBuilder::new(Client::Sqlite);
+    builder
+        .select(Select::Columns(vec!["id".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.group_by(vec!["id".into()]);
+            qb.having_in("status", vec![]);
+        });
+    let sql = builder.to_sql();
+    assert!(sql.0.contains("1 = 0"));
+}
+
+#[test]
+fn test_sqlite_where_exists_with_binds() {
+    let mut builder = ChainBuilder::new(Client::Sqlite);
+    builder
+        .select(Select::Columns(vec!["*".into()]))
+        .table("users")
+        .query(|qb| {
+            qb.where_exists(|sub| {
+                sub.select(Select::Columns(vec!["1".into()]))
+                    .table("orders")
+                    .query(|q| {
+                        q.where_eq("orders.user_id", Value::Number(1.into()));
+                    });
+            });
+        });
+    let (sql, binds) = builder.to_sql();
+    assert!(sql.contains("EXISTS"));
+    assert_eq!(binds.len(), 1);
+}
+
+#[test]
 fn test_sqlite_chain_builder() {
     let mut builder = ChainBuilder::new(Client::Sqlite);
     builder

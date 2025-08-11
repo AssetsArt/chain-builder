@@ -4,6 +4,18 @@ use crate::query::QueryBuilder;
 use crate::types::Common;
 use serde_json::Value;
 
+fn build_placeholders(len: usize) -> String {
+    if len == 0 {
+        return String::new();
+    }
+    let mut s = String::with_capacity(len * 3 - 2);
+    s.push('?');
+    for _ in 1..len {
+        s.push_str(", ?");
+    }
+    s
+}
+
 /// Trait for common query operations
 pub trait QueryCommon {
     /// Add a WITH clause
@@ -121,13 +133,23 @@ impl HavingClauses for QueryBuilder {
     }
 
     fn having_in(&mut self, column: &str, values: Vec<Value>) {
-        let placeholders = vec!["?"; values.len()].join(", ");
+        if values.is_empty() {
+            self.query_common
+                .push(Common::Having("1 = 0".to_string(), None));
+            return;
+        }
+        let placeholders = build_placeholders(values.len());
         let sql = format!("{} IN ({})", column, placeholders);
         self.query_common.push(Common::Having(sql, Some(values)));
     }
 
     fn having_not_in(&mut self, column: &str, values: Vec<Value>) {
-        let placeholders = vec!["?"; values.len()].join(", ");
+        if values.is_empty() {
+            self.query_common
+                .push(Common::Having("1 = 1".to_string(), None));
+            return;
+        }
+        let placeholders = build_placeholders(values.len());
         let sql = format!("{} NOT IN ({})", column, placeholders);
         self.query_common.push(Common::Having(sql, Some(values)));
     }
@@ -316,14 +338,14 @@ impl WhereClauses for QueryBuilder {
     }
 
     fn where_subquery(&mut self, query: impl FnOnce(&mut QueryBuilder)) {
-        let mut sub_query = QueryBuilder::default();
+        let mut sub_query = QueryBuilder::new(self.client.clone());
         query(&mut sub_query);
         self.statement
             .push(crate::types::Statement::SubChain(Box::new(sub_query)));
     }
 
     fn or(&mut self) -> &mut QueryBuilder {
-        let or_query = QueryBuilder::default();
+        let or_query = QueryBuilder::new(self.client.clone());
         self.statement
             .push(crate::types::Statement::OrChain(Box::new(or_query)));
         self.statement.last_mut().unwrap().to_query_builder()
@@ -348,19 +370,21 @@ impl WhereClauses for QueryBuilder {
     }
 
     fn where_exists(&mut self, query: impl FnOnce(&mut crate::builder::ChainBuilder)) {
-        let mut sub_builder = crate::builder::ChainBuilder::new(crate::types::Client::Mysql);
+        let mut sub_builder = crate::builder::ChainBuilder::new(self.client.clone());
         query(&mut sub_builder);
-        let sql = format!("EXISTS ({})", sub_builder.to_sql().0);
+        let (sub_sql, sub_binds) = sub_builder.to_sql();
+        let sql = format!("EXISTS ({})", sub_sql);
         self.statement
-            .push(crate::types::Statement::Raw((sql, None)));
+            .push(crate::types::Statement::Raw((sql, Some(sub_binds))));
     }
 
     fn where_not_exists(&mut self, query: impl FnOnce(&mut crate::builder::ChainBuilder)) {
-        let mut sub_builder = crate::builder::ChainBuilder::new(crate::types::Client::Mysql);
+        let mut sub_builder = crate::builder::ChainBuilder::new(self.client.clone());
         query(&mut sub_builder);
-        let sql = format!("NOT EXISTS ({})", sub_builder.to_sql().0);
+        let (sub_sql, sub_binds) = sub_builder.to_sql();
+        let sql = format!("NOT EXISTS ({})", sub_sql);
         self.statement
-            .push(crate::types::Statement::Raw((sql, None)));
+            .push(crate::types::Statement::Raw((sql, Some(sub_binds))));
     }
 
     fn where_json_contains(&mut self, column: &str, value: Value) {
