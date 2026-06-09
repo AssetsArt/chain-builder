@@ -5,7 +5,7 @@
 //! counter, so Postgres yields `$1..$n` in first-appearance order (including
 //! across nested groups) while MySQL/SQLite yield `?`.
 
-use crate::v2::builder::{Method, Order, QueryBuilder};
+use crate::v2::builder::{Cte, Having, Join, JoinCond, JoinKind, Method, Order, QueryBuilder};
 use crate::v2::dialect::Dialect;
 use crate::v2::ident::escape_identifier;
 use crate::v2::value::Value;
@@ -61,6 +61,8 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
 
     match qb.method {
         Method::Select => {
+            // CTEs are emitted first so their binds (and pg `$N`) come first.
+            write_ctes::<D>(ctx, &qb.ctes);
             ctx.sql.push_str("SELECT ");
             if qb.select_cols.is_empty() {
                 ctx.sql.push('*');
@@ -70,10 +72,13 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             }
             ctx.sql.push_str(" FROM ");
             ctx.sql.push_str(&table);
+            write_joins::<D>(ctx, &qb.joins);
             write_wheres::<D>(ctx, &qb.wheres);
             write_group_by(ctx, &qb.groups);
+            write_having::<D>(ctx, &qb.havings);
             write_order_by(ctx, &qb.orders);
             write_limit_offset::<D>(ctx, qb.limit, qb.offset);
+            write_unions::<D>(ctx, &qb.unions);
         }
         Method::Insert => {
             if qb.set.is_empty() {
@@ -131,6 +136,119 @@ fn write_group_by(ctx: &mut Ctx, groups: &[String]) {
     ctx.sql.push_str(" GROUP BY ");
     let cols: Vec<String> = groups.iter().map(|c| ctx.esc(c)).collect();
     ctx.sql.push_str(&cols.join(", "));
+}
+
+/// Render each `JOIN` (SELECT only): ` {KIND} {esc table}[ ON cond AND …]`.
+/// `CROSS JOIN` emits no `ON`. Placeholders from `OnVal`/`OnRaw` continue the
+/// running counter.
+fn write_joins<D: Dialect>(ctx: &mut Ctx, joins: &[Join]) {
+    for j in joins {
+        let kw = match j.kind {
+            JoinKind::Inner => " INNER JOIN ",
+            JoinKind::Left => " LEFT JOIN ",
+            JoinKind::Right => " RIGHT JOIN ",
+            JoinKind::FullOuter => " FULL OUTER JOIN ",
+            JoinKind::Cross => " CROSS JOIN ",
+        };
+        ctx.sql.push_str(kw);
+        let table = ctx.esc(&j.table);
+        ctx.sql.push_str(&table);
+        if j.on.is_empty() {
+            continue;
+        }
+        ctx.sql.push_str(" ON ");
+        for (i, cond) in j.on.iter().enumerate() {
+            if i > 0 {
+                ctx.sql.push_str(" AND ");
+            }
+            match cond {
+                JoinCond::On(c, op, c2) => {
+                    let l = ctx.esc(c);
+                    let r = ctx.esc(c2);
+                    ctx.sql.push_str(&l);
+                    ctx.sql.push(' ');
+                    ctx.sql.push_str(op);
+                    ctx.sql.push(' ');
+                    ctx.sql.push_str(&r);
+                }
+                JoinCond::OnVal(c, op, v) => {
+                    let l = ctx.esc(c);
+                    ctx.sql.push_str(&l);
+                    ctx.sql.push(' ');
+                    ctx.sql.push_str(op);
+                    ctx.sql.push(' ');
+                    ctx.placeholder::<D>(v.clone());
+                }
+                JoinCond::OnRaw(sql, binds) => {
+                    // Verbatim escape hatch (see `JoinClause::on_raw` docs).
+                    ctx.sql.push_str(sql);
+                    ctx.binds.extend(binds.iter().cloned());
+                }
+            }
+        }
+    }
+}
+
+/// Render ` HAVING cond AND …` (SELECT only) after GROUP BY. No-op when empty.
+fn write_having<D: Dialect>(ctx: &mut Ctx, havings: &[Having]) {
+    if havings.is_empty() {
+        return;
+    }
+    ctx.sql.push_str(" HAVING ");
+    for (i, h) in havings.iter().enumerate() {
+        if i > 0 {
+            ctx.sql.push_str(" AND ");
+        }
+        match h {
+            Having::Col { col, op, val } => {
+                let c = ctx.esc(col);
+                ctx.sql.push_str(&c);
+                ctx.sql.push(' ');
+                ctx.sql.push_str(op);
+                ctx.sql.push(' ');
+                ctx.placeholder::<D>(val.clone());
+            }
+            Having::Raw { sql, binds } => {
+                // Verbatim escape hatch (see `having_raw` docs).
+                ctx.sql.push_str(sql);
+                ctx.binds.extend(binds.iter().cloned());
+            }
+        }
+    }
+}
+
+/// Render `WITH [RECURSIVE] name AS (body), … ` BEFORE the main SELECT.
+///
+/// Single-pass per CTE: the name header is written and the body compiled in one
+/// go, so SQL text order equals bind-push order (placeholder/bind never desync).
+fn write_ctes<D: Dialect>(ctx: &mut Ctx, ctes: &[Cte<D>]) {
+    if ctes.is_empty() {
+        return;
+    }
+    ctx.sql.push_str("WITH ");
+    if ctes.iter().any(|c| c.recursive) {
+        ctx.sql.push_str("RECURSIVE ");
+    }
+    for (i, cte) in ctes.iter().enumerate() {
+        if i > 0 {
+            ctx.sql.push_str(", ");
+        }
+        let name = ctx.esc(&cte.name);
+        ctx.sql.push_str(&name);
+        ctx.sql.push_str(" AS (");
+        compile_into::<D>(ctx, &cte.query);
+        ctx.sql.push(')');
+    }
+    ctx.sql.push(' ');
+}
+
+/// Render ` UNION [ALL] body` per arm, AFTER the main query (SELECT only).
+fn write_unions<D: Dialect>(ctx: &mut Ctx, unions: &[(bool, QueryBuilder<D>)]) {
+    for (all, arm) in unions {
+        ctx.sql
+            .push_str(if *all { " UNION ALL " } else { " UNION " });
+        compile_into::<D>(ctx, arm);
+    }
 }
 
 /// Render `ORDER BY a ASC, b DESC, …` (SELECT only). No-op when empty.
