@@ -149,6 +149,30 @@ impl<D: Dialect> JoinClause<D> {
     }
 }
 
+/// What to do when an `INSERT` hits a conflict (see [`OnConflict`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictAction {
+    /// Skip the conflicting row (`DO NOTHING` / `INSERT IGNORE`).
+    DoNothing,
+    /// Update the non-target inserted columns from the proposed row
+    /// (`DO UPDATE SET … = EXCLUDED.…` / `ON DUPLICATE KEY UPDATE …`).
+    Merge,
+}
+
+/// An `ON CONFLICT` specification attached to an `INSERT`.
+///
+/// `targets` are the raw conflict-target column identifiers (escaped at compile
+/// time). They are honored by Postgres / SQLite (`OnConflict` style) and
+/// **ignored** by MySQL (`OnDuplicateKey` style), which relies on its own
+/// unique/primary keys.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OnConflict {
+    /// Raw conflict-target column identifiers.
+    pub targets: Vec<String>,
+    /// What to do on conflict.
+    pub action: ConflictAction,
+}
+
 /// Which kind of statement is being built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Method {
@@ -181,6 +205,10 @@ pub struct QueryBuilder<D: Dialect> {
     pub(crate) offset: Option<i64>,
     pub(crate) ctes: Vec<Cte<D>>,
     pub(crate) unions: Vec<(bool, QueryBuilder<D>)>,
+    /// `ON CONFLICT` spec for `INSERT` (ignored on UPDATE/DELETE).
+    pub(crate) on_conflict: Option<OnConflict>,
+    /// `RETURNING` column list (raw; `"*"` emitted unescaped).
+    pub(crate) returning: Vec<String>,
     _marker: PhantomData<D>,
 }
 
@@ -202,6 +230,8 @@ impl<D: Dialect> QueryBuilder<D> {
             offset: None,
             ctes: Vec::new(),
             unions: Vec::new(),
+            on_conflict: None,
+            returning: Vec::new(),
             _marker: PhantomData,
         }
     }
@@ -388,6 +418,68 @@ impl<D: Dialect> QueryBuilder<D> {
     /// Build a `DELETE`. WHERE still applies.
     pub fn delete(mut self) -> Self {
         self.method = Method::Delete;
+        self
+    }
+
+    /// On conflict, skip the row (`INSERT`-only; ignored on UPDATE/DELETE).
+    ///
+    /// `targets` are the conflict-target columns (may be empty).
+    ///
+    /// - **Postgres / SQLite:** emits `ON CONFLICT ({targets}) DO NOTHING`, or
+    ///   bare `ON CONFLICT DO NOTHING` when `targets` is empty.
+    /// - **MySQL:** emits `INSERT IGNORE INTO …` (no trailing clause). Note that
+    ///   `IGNORE` suppresses *more* than duplicate-key errors (also truncation
+    ///   and bad-value coercion) — broader than pg/sqlite `DO NOTHING`.
+    pub fn on_conflict_do_nothing<I, S>(mut self, targets: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.on_conflict = Some(OnConflict {
+            targets: targets.into_iter().map(|c| c.as_ref().to_owned()).collect(),
+            action: ConflictAction::DoNothing,
+        });
+        self
+    }
+
+    /// On conflict, update the non-target inserted columns from the proposed row
+    /// (`INSERT`-only; ignored on UPDATE/DELETE).
+    ///
+    /// - **Postgres / SQLite:** emits
+    ///   `ON CONFLICT ({targets}) DO UPDATE SET {c} = EXCLUDED.{c}, …` for every
+    ///   inserted column *except* the conflict targets. If `targets` is empty or
+    ///   covers all inserted columns (empty SET list), falls back to the
+    ///   `DO NOTHING` rendering (pg/sqlite require a target for `DO UPDATE`).
+    /// - **MySQL:** the explicit `targets` are **ignored** (MySQL uses its own
+    ///   unique/primary keys); emits
+    ///   `ON DUPLICATE KEY UPDATE {c} = VALUES({c}), …` for *all* inserted
+    ///   columns. `VALUES()` is used for MySQL 5.7/8.x compatibility. Including a
+    ///   PK column in the insert set yields a redundant-but-harmless
+    ///   `pk = VALUES(pk)`.
+    pub fn on_conflict_merge<I, S>(mut self, targets: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.on_conflict = Some(OnConflict {
+            targets: targets.into_iter().map(|c| c.as_ref().to_owned()).collect(),
+            action: ConflictAction::Merge,
+        });
+        self
+    }
+
+    /// Add a `RETURNING` column list. Works on INSERT / UPDATE / DELETE for
+    /// Postgres and SQLite; a `"*"` column is emitted unescaped (`RETURNING *`).
+    ///
+    /// On **MySQL** this is a silent no-op (MySQL has no `RETURNING`). On
+    /// **SQLite** `RETURNING` requires SQLite ≥ 3.35.0 (2021); `supports_returning()`
+    /// is a compile-time dialect flag, not a runtime version check.
+    pub fn returning<I, S>(mut self, cols: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.returning = cols.into_iter().map(|c| c.as_ref().to_owned()).collect();
         self
     }
 

@@ -5,8 +5,10 @@
 //! counter, so Postgres yields `$1..$n` in first-appearance order (including
 //! across nested groups) while MySQL/SQLite yield `?`.
 
-use crate::v2::builder::{Cte, Having, Join, JoinCond, JoinKind, Method, Order, QueryBuilder};
-use crate::v2::dialect::Dialect;
+use crate::v2::builder::{
+    ConflictAction, Cte, Having, Join, JoinCond, JoinKind, Method, Order, QueryBuilder,
+};
+use crate::v2::dialect::{Dialect, UpsertStyle};
 use crate::v2::ident::escape_identifier;
 use crate::v2::value::Value;
 use crate::v2::where_::{Conj, Predicate};
@@ -95,7 +97,19 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             }
             let mut rows: Vec<&(String, Value)> = qb.set.iter().collect();
             rows.sort_by(|a, b| a.0.cmp(&b.0));
-            ctx.sql.push_str("INSERT INTO ");
+
+            // Decide the INSERT keyword up front: MySQL `DO NOTHING` becomes
+            // `INSERT IGNORE INTO …` with no trailing conflict clause.
+            let mysql_ignore = D::upsert_style() == UpsertStyle::OnDuplicateKey
+                && matches!(
+                    qb.on_conflict.as_ref().map(|c| c.action),
+                    Some(ConflictAction::DoNothing)
+                );
+            if mysql_ignore {
+                ctx.sql.push_str("INSERT IGNORE INTO ");
+            } else {
+                ctx.sql.push_str("INSERT INTO ");
+            }
             ctx.sql.push_str(&table);
             ctx.sql.push_str(" (");
             let cols: Vec<String> = rows.iter().map(|(k, _)| ctx.esc(k)).collect();
@@ -108,6 +122,14 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
                 ctx.placeholder::<D>(v.clone());
             }
             ctx.sql.push(')');
+
+            if !mysql_ignore {
+                if let Some(oc) = &qb.on_conflict {
+                    let inserted: Vec<&str> = rows.iter().map(|(k, _)| k.as_str()).collect();
+                    write_on_conflict::<D>(ctx, oc, &inserted);
+                }
+            }
+            write_returning::<D>(ctx, &qb.returning);
         }
         Method::Update => {
             if qb.set.is_empty() {
@@ -128,13 +150,88 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
                 ctx.placeholder::<D>(v.clone());
             }
             write_wheres::<D>(ctx, &qb.wheres);
+            write_returning::<D>(ctx, &qb.returning);
         }
         Method::Delete => {
             ctx.sql.push_str("DELETE FROM ");
             ctx.sql.push_str(&table);
             write_wheres::<D>(ctx, &qb.wheres);
+            write_returning::<D>(ctx, &qb.returning);
         }
     }
+}
+
+/// Render the upsert conflict clause for an `INSERT` (never called for the
+/// MySQL `INSERT IGNORE` path, which is handled at the keyword). `inserted` is
+/// the sorted-key list of inserted columns.
+fn write_on_conflict<D: Dialect>(
+    ctx: &mut Ctx,
+    oc: &crate::v2::builder::OnConflict,
+    inserted: &[&str],
+) {
+    match D::upsert_style() {
+        UpsertStyle::OnDuplicateKey => {
+            // MySQL merge: `ON DUPLICATE KEY UPDATE c = VALUES(c), …` for ALL
+            // inserted columns (explicit targets are ignored).
+            ctx.sql.push_str(" ON DUPLICATE KEY UPDATE ");
+            let sets: Vec<String> = inserted
+                .iter()
+                .map(|c| {
+                    let e = ctx.esc(c);
+                    format!("{e} = VALUES({e})")
+                })
+                .collect();
+            ctx.sql.push_str(&sets.join(", "));
+        }
+        UpsertStyle::OnConflict => {
+            let targets = &oc.targets;
+            // SET list = inserted columns minus the conflict targets.
+            let set_cols: Vec<&&str> = inserted
+                .iter()
+                .filter(|c| !targets.iter().any(|t| t == **c))
+                .collect();
+            let do_update = matches!(oc.action, ConflictAction::Merge)
+                && !targets.is_empty()
+                && !set_cols.is_empty();
+
+            ctx.sql.push_str(" ON CONFLICT");
+            if !targets.is_empty() {
+                ctx.sql.push_str(" (");
+                let cols: Vec<String> = targets.iter().map(|t| ctx.esc(t)).collect();
+                ctx.sql.push_str(&cols.join(", "));
+                ctx.sql.push(')');
+            }
+            if do_update {
+                ctx.sql.push_str(" DO UPDATE SET ");
+                let sets: Vec<String> = set_cols
+                    .iter()
+                    .map(|c| {
+                        let e = ctx.esc(c);
+                        // `EXCLUDED` is an unquoted, case-insensitive identifier
+                        // accepted by both pg and sqlite — emitted literally.
+                        format!("{e} = EXCLUDED.{e}")
+                    })
+                    .collect();
+                ctx.sql.push_str(&sets.join(", "));
+            } else {
+                ctx.sql.push_str(" DO NOTHING");
+            }
+        }
+    }
+}
+
+/// Render ` RETURNING col, …` when the dialect supports it and the list is
+/// non-empty. A `"*"` column is emitted unescaped. No-op otherwise (e.g. MySQL).
+fn write_returning<D: Dialect>(ctx: &mut Ctx, cols: &[String]) {
+    if !D::supports_returning() || cols.is_empty() {
+        return;
+    }
+    ctx.sql.push_str(" RETURNING ");
+    let parts: Vec<String> = cols
+        .iter()
+        .map(|c| if c == "*" { "*".to_owned() } else { ctx.esc(c) })
+        .collect();
+    ctx.sql.push_str(&parts.join(", "));
 }
 
 /// Render `GROUP BY a, b, …` (SELECT only). No-op when there are no columns.
