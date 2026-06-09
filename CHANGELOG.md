@@ -27,6 +27,15 @@
   value; they bind `NULL` defensively instead. Debug `println!` calls on these
   paths were removed.
 
+### Changed
+
+#### ⬆️ Dependencies
+- **sqlx upgraded `0.8` → `0.9`**
+  - Adapted to sqlx 0.9's `SqlSafeStr` requirement: builder-generated SQL is now
+    wrapped with `sqlx::AssertSqlSafe` in the `to_sqlx_query*` / `count` helpers.
+  - Updated `SqliteArguments` usages for the removed lifetime parameter in sqlx 0.9.
+- Refreshed `Cargo.lock` to the latest compatible versions of all transitive deps.
+
 ### ⚠️ Breaking change
 - Generated SQL now quotes identifiers. Pass **bare** names to the structured API
   (`"name"`, not `` "`name`" ``); pre-quoting would be double-escaped. If you
