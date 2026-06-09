@@ -103,7 +103,7 @@ dependencies = [
 
 [[package]]
 name = "chain-builder"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "chain-builder",
  "serde",
