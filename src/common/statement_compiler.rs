@@ -5,6 +5,7 @@ pub fn statement_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) 
     let mut statement_sql = String::new();
     let mut statement_binds: Vec<serde_json::Value> = vec![];
     let mut is_first = true;
+    let client = chain_builder.query.client.clone();
     let mut build_statement = |statement: &Statement| match statement {
         Statement::Value(field, operator, value) => {
             if (*operator == Operator::In || *operator == Operator::NotIn)
@@ -29,7 +30,7 @@ pub fn statement_compiler(chain_builder: &ChainBuilder) -> (String, Vec<Value>) 
             } else {
                 statement_sql.push_str(" AND ");
             }
-            statement_sql.push_str(field);
+            statement_sql.push_str(&crate::dialect::escape_identifier(field, &client));
             statement_sql.push(' ');
             if *operator == Operator::Between || *operator == Operator::NotBetween {
                 statement_sql.push_str(&format!("{} ? AND ?", operator_str));

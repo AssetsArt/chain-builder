@@ -135,7 +135,8 @@ impl JoinMethods for QueryBuilder {
     }
 
     fn join_using(&mut self, table: &str, columns: Vec<String>) {
-        let columns_str = columns.join(", ");
+        let table = crate::dialect::escape_identifier(table, &self.client);
+        let columns_str = crate::dialect::escape_identifier_list(&columns, &self.client);
         let sql = format!("JOIN {} USING ({})", table, columns_str);
         self.raw_join(&sql, None);
     }

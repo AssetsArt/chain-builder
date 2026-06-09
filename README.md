@@ -18,6 +18,7 @@ A flexible and easy-to-use query builder for MySQL and SQLite in Rust. This libr
 - **Advanced JOINs**: FULL OUTER JOIN, CROSS JOIN, JOIN USING
 - **Raw SQL**: Fallback to raw SQL when needed
 - **Multiple Operations**: SELECT, INSERT, UPDATE, DELETE
+- **Injection-safe identifiers**: Table/column/alias names are dialect-escaped automatically (see [Security](#security))
 - **sqlx Integration**: Direct integration with sqlx for async database operations
 - **Modern Architecture**: Clean, modular codebase with better maintainability
 
@@ -503,6 +504,36 @@ The library is organized into several modules:
 - **`src/sqlite/`** - SQLite-specific compilation
 - **`src/sqlx_mysql.rs`** - MySQL sqlx integration (conditional compilation)
 - **`src/sqlx_sqlite.rs`** - SQLite sqlx integration (conditional compilation)
+- **`src/dialect.rs`** - Dialect-aware identifier escaping
+
+## Security
+
+Chain Builder is designed to be safe against SQL injection on **two** axes:
+
+- **Values** are always sent as bound parameters (`?`), never inlined into SQL.
+- **Identifiers** (table, column, and alias names) passed to the structured API
+  are automatically escaped for the active dialect — backticks for MySQL,
+  double quotes for SQLite/PostgreSQL — with any embedded quote character doubled.
+  Qualified names like `users.id` are escaped segment-by-segment
+  (`` `users`.`id` ``) and a `*` segment is preserved (`` `users`.* ``).
+
+This means you can safely pass an untrusted column name (e.g. a dynamic
+`ORDER BY` coming from a request) without it being able to break out of the
+identifier context:
+
+```rust
+// "name`; DROP TABLE users; --" becomes a single quoted identifier:
+//   ... ORDER BY `name``; DROP TABLE users; --` ASC
+qb.order_by(user_supplied_column, "ASC");
+```
+
+> **Pass bare identifiers.** Do **not** pre-quote names yourself (e.g. `` "`name`" ``);
+> the builder quotes them for you, and a pre-quoted name would be double-escaped.
+
+The `*_raw` methods (`select_raw`, `where_raw`, `group_by_raw`, `order_by_raw`,
+`having_raw`, `add_raw`, `table_raw`, `raw_join`, `on_raw`) and the `having*`
+helpers are **expression** escape hatches and are emitted verbatim — never pass
+untrusted input through them.
 
 ## Feature Flags
 

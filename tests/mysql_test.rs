@@ -51,7 +51,7 @@ fn test_chain_builder() {
     // println!("final binds: {:?}", sql.1);
     assert_eq!(
             sql.0,
-            "SELECT * FROM mydb.users WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?) LIMIT ?"
+            "SELECT * FROM `mydb`.`users` WHERE `name` = ? AND `city` = ? AND `department` IN (?,?) AND (`status` = ? OR (`status` = ? AND `registered_at` BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?) LIMIT ?"
         );
     assert_eq!(
         sql.1,
@@ -100,7 +100,7 @@ fn test_join() {
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {:?}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?";
+    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM `mydb`.`users` JOIN `mydb`.`details` ON `details`.`id` = `users`.`d_id` AND `details`.`id_w` = `users`.`d_id_w` OR (`details`.`id_s` = `users`.`d_id_s` AND `details`.`id_w` = `users`.`d_id_w`) WHERE `name` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -145,7 +145,7 @@ fn test_tow_join() {
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {:?}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) JOIN mydb.address ON address.id = users.a_id AND address.id_w = users.a_id_w OR (address.id_s = users.a_id_s AND address.id_w = users.a_id_w) WHERE name = ?";
+    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM `mydb`.`users` JOIN `mydb`.`details` ON `details`.`id` = `users`.`d_id` AND `details`.`id_w` = `users`.`d_id_w` OR (`details`.`id_s` = `users`.`d_id_s` AND `details`.`id_w` = `users`.`d_id_w`) JOIN `mydb`.`address` ON `address`.`id` = `users`.`a_id` AND `address`.`id_w` = `users`.`a_id_w` OR (`address`.`id_s` = `users`.`a_id_s` AND `address`.`id_w` = `users`.`a_id_w`) WHERE `name` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -173,7 +173,7 @@ fn test_join_raw() {
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {:?}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users LEFT JOIN details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?";
+    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM `mydb`.`users` LEFT JOIN details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE `name` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -190,14 +190,14 @@ fn test_insert() {
         .table("users")
         .insert(serde_json::json!({
             "name": "John",
-            "`city`": "New York",
+            "city": "New York",
             "department": "IT",
         }));
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "INSERT INTO mydb.users (`city`, department, name) VALUES (?, ?, ?)";
+    let true_sql = "INSERT INTO `mydb`.`users` (`city`, `department`, `name`) VALUES (?, ?, ?)";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -219,12 +219,12 @@ fn test_insert_many() {
         .insert_many(vec![
             serde_json::json!({
                 "name": "John",
-                "`city`": "New York",
+                "city": "New York",
                 "department": "IT",
             }),
             serde_json::json!({
                 "name": "Jane",
-                "`city`": "New York",
+                "city": "New York",
                 "department": "HR",
             }),
         ]);
@@ -232,7 +232,7 @@ fn test_insert_many() {
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "INSERT INTO mydb.users (`city`, department, name) VALUES (?, ?, ?), (?, ?, ?)";
+    let true_sql = "INSERT INTO `mydb`.`users` (`city`, `department`, `name`) VALUES (?, ?, ?), (?, ?, ?)";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -256,7 +256,7 @@ fn test_update() {
         .table("users")
         .update(serde_json::json!({
             "name": "John",
-            "`city`": "New York",
+            "city": "New York",
             "department": "IT",
         }))
         .query(|qb| {
@@ -266,7 +266,7 @@ fn test_update() {
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "UPDATE mydb.users SET `city` = ?, department = ?, name = ? WHERE id = ?";
+    let true_sql = "UPDATE `mydb`.`users` SET `city` = ?, `department` = ?, `name` = ? WHERE `id` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -294,7 +294,7 @@ fn test_delete() {
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "DELETE FROM mydb.users WHERE id = ?";
+    let true_sql = "DELETE FROM `mydb`.`users` WHERE `id` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, vec![Value::Number(1.into())]);
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -332,7 +332,7 @@ fn test_with() {
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "WITH active_users AS (SELECT *, (SELECT * FROM mydb.address WHERE city = ?) AS address FROM mydb.users WHERE status = ?) SELECT * FROM active_users WHERE name = ?";
+    let true_sql = "WITH `active_users` AS (SELECT *, (SELECT * FROM `mydb`.`address` WHERE `city` = ?) AS `address` FROM `mydb`.`users` WHERE `status` = ?) SELECT * FROM `active_users` WHERE `name` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -377,7 +377,7 @@ fn test_with_recursive() {
     let to_sqlx = builder.to_sqlx_query();
     // println!("final sql: {}", sql.0);
     // println!("final binds: {:?}", sql.1);
-    let true_sql = "WITH RECURSIVE active_users AS (SELECT *, (SELECT * FROM mydb.address WHERE city = ?) AS address FROM mydb.users WHERE status = ?) SELECT * FROM active_users WHERE name = ?";
+    let true_sql = "WITH RECURSIVE `active_users` AS (SELECT *, (SELECT * FROM `mydb`.`address` WHERE `city` = ?) AS `address` FROM `mydb`.`users` WHERE `status` = ?) SELECT * FROM `active_users` WHERE `name` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -413,7 +413,7 @@ fn test_union() {
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql =
-        "SELECT * FROM mydb.users WHERE name = ? UNION SELECT * FROM mydb.users WHERE status = ?";
+        "SELECT * FROM `mydb`.`users` WHERE `name` = ? UNION SELECT * FROM `mydb`.`users` WHERE `status` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -449,7 +449,7 @@ fn test_union_all() {
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql =
-        "SELECT * FROM mydb.users WHERE name = ? UNION ALL SELECT * FROM mydb.users WHERE status = ? UNION ALL SELECT * FROM mydb.users WHERE status = ?";
+        "SELECT * FROM `mydb`.`users` WHERE `name` = ? UNION ALL SELECT * FROM `mydb`.`users` WHERE `status` = ? UNION ALL SELECT * FROM `mydb`.`users` WHERE `status` = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -476,7 +476,7 @@ fn test_limit_offset() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users WHERE name = ? LIMIT ? OFFSET ?";
+    let true_sql = "SELECT * FROM `mydb`.`users` WHERE `name` = ? LIMIT ? OFFSET ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -504,7 +504,7 @@ fn test_group_by() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users WHERE name = ? GROUP BY name, city LIMIT ? OFFSET ?";
+    let true_sql = "SELECT * FROM `mydb`.`users` WHERE `name` = ? GROUP BY `name`, `city` LIMIT ? OFFSET ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -532,7 +532,7 @@ fn test_group_by_raw() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users WHERE name = ? GROUP BY name, city LIMIT ? OFFSET ?";
+    let true_sql = "SELECT * FROM `mydb`.`users` WHERE `name` = ? GROUP BY name, city LIMIT ? OFFSET ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -562,7 +562,7 @@ fn test_order_by() {
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql =
-        "SELECT * FROM mydb.users WHERE name = ? ORDER BY name ASC, city DESC LIMIT ? OFFSET ?";
+        "SELECT * FROM `mydb`.`users` WHERE `name` = ? ORDER BY `name` ASC, `city` DESC LIMIT ? OFFSET ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -590,7 +590,7 @@ fn test_order_by_raw() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users WHERE name = ? ORDER BY `count`, `name` order by (`name` is not null) desc LIMIT ? OFFSET ?";
+    let true_sql = "SELECT * FROM `mydb`.`users` WHERE `name` = ? ORDER BY `count`, `name` order by (`name` is not null) desc LIMIT ? OFFSET ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -623,7 +623,7 @@ fn test_table_raw() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM (SELECT * FROM users WHERE id = ?) as pp WHERE name = ? AND count > ? ORDER BY `count`, `name` order by (`name` is not null) desc LIMIT ? OFFSET ?";
+    let true_sql = "SELECT * FROM (SELECT * FROM users WHERE id = ?) as pp WHERE `name` = ? AND `count` > ? ORDER BY `count`, `name` order by (`name` is not null) desc LIMIT ? OFFSET ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,

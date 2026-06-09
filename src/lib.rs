@@ -29,6 +29,7 @@
 // Core modules
 mod builder;
 mod common;
+mod dialect;
 mod query;
 mod types;
 

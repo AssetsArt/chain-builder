@@ -18,8 +18,8 @@ fn test_sqlite_basic_select() {
     println!("SQLite SELECT SQL: {}", sql);
     println!("Binds: {:?}", binds);
 
-    assert!(sql.contains("SELECT * FROM users"));
-    assert!(sql.contains("WHERE status = ?"));
+    assert!(sql.contains("SELECT * FROM \"users\""));
+    assert!(sql.contains("WHERE \"status\" = ?"));
     assert_eq!(binds.len(), 1);
 }
 
@@ -117,7 +117,7 @@ fn test_sqlite_chain_builder() {
     let sql = builder.to_sql();
     assert_eq!(
         sql.0,
-        "SELECT * FROM mydb.users WHERE name = ? AND city = ? AND department IN (?,?) AND (status = ? OR (status = ? AND registered_at BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?) LIMIT ?"
+        "SELECT * FROM \"mydb\".\"users\" WHERE \"name\" = ? AND \"city\" = ? AND \"department\" IN (?,?) AND (\"status\" = ? OR (\"status\" = ? AND \"registered_at\" BETWEEN ? AND ?)) AND (latitude BETWEEN ? AND ?) AND (longitude BETWEEN ? AND ?) LIMIT ?"
     );
     assert_eq!(
         sql.1,
@@ -164,7 +164,7 @@ fn test_sqlite_join() {
     ));
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM mydb.users JOIN mydb.details ON details.id = users.d_id AND details.id_w = users.d_id_w OR (details.id_s = users.d_id_s AND details.id_w = users.d_id_w) WHERE name = ?";
+    let true_sql = "SELECT *, (SELECT COUNT(*) FROM `mydb`.`users` WHERE users.id = ?) AS count FROM \"mydb\".\"users\" JOIN \"mydb\".\"details\" ON \"details\".\"id\" = \"users\".\"d_id\" AND \"details\".\"id_w\" = \"users\".\"d_id_w\" OR (\"details\".\"id_s\" = \"users\".\"d_id_s\" AND \"details\".\"id_w\" = \"users\".\"d_id_w\") WHERE \"name\" = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -191,7 +191,7 @@ fn test_sqlite_tow_join() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users JOIN mydb.details ON details.id = users.d_id JOIN mydb.profiles ON profiles.id = users.p_id WHERE name = ?";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" JOIN \"mydb\".\"details\" ON \"details\".\"id\" = \"users\".\"d_id\" JOIN \"mydb\".\"profiles\" ON \"profiles\".\"id\" = \"users\".\"p_id\" WHERE \"name\" = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, vec![Value::String("John".to_string())]);
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -213,7 +213,7 @@ fn test_sqlite_join_raw() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users JOIN details ON details.id = users.d_id AND details.status = ? WHERE name = ?";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" JOIN details ON details.id = users.d_id AND details.status = ? WHERE \"name\" = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -238,7 +238,7 @@ fn test_sqlite_insert() {
     println!("SQLite INSERT SQL: {}", sql);
     println!("Binds: {:?}", binds);
 
-    assert!(sql.contains("INSERT INTO users"));
+    assert!(sql.contains("INSERT INTO \"users\""));
     assert!(sql.contains("VALUES (?, ?, ?)"));
     assert_eq!(binds.len(), 3);
 }
@@ -263,7 +263,7 @@ fn test_sqlite_insert_many() {
     println!("SQLite INSERT MANY SQL: {}", sql);
     println!("Binds: {:?}", binds);
 
-    assert!(sql.contains("INSERT INTO users"));
+    assert!(sql.contains("INSERT INTO \"users\""));
     assert!(sql.contains("VALUES (?, ?, ?), (?, ?, ?)"));
     assert_eq!(binds.len(), 6);
 }
@@ -285,10 +285,10 @@ fn test_sqlite_update() {
     println!("SQLite UPDATE SQL: {}", sql);
     println!("Binds: {:?}", binds);
 
-    assert!(sql.contains("UPDATE users SET"));
-    assert!(sql.contains("status = ?"));
-    assert!(sql.contains("updated_at = ?"));
-    assert!(sql.contains("WHERE id = ?"));
+    assert!(sql.contains("UPDATE \"users\" SET"));
+    assert!(sql.contains("\"status\" = ?"));
+    assert!(sql.contains("\"updated_at\" = ?"));
+    assert!(sql.contains("WHERE \"id\" = ?"));
     assert_eq!(binds.len(), 3);
 }
 
@@ -303,8 +303,8 @@ fn test_sqlite_delete() {
     println!("SQLite DELETE SQL: {}", sql);
     println!("Binds: {:?}", binds);
 
-    assert!(sql.contains("DELETE FROM users"));
-    assert!(sql.contains("WHERE status = ?"));
+    assert!(sql.contains("DELETE FROM \"users\""));
+    assert!(sql.contains("WHERE \"status\" = ?"));
     assert_eq!(binds.len(), 1);
 }
 
@@ -338,7 +338,7 @@ fn test_sqlite_with() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "WITH active_users AS (SELECT *, (SELECT * FROM mydb.address WHERE city = ?) AS address FROM mydb.users)SELECT * FROM active_users WHERE name = ?";
+    let true_sql = "WITH \"active_users\" AS (SELECT *, (SELECT * FROM \"mydb\".\"address\" WHERE \"city\" = ?) AS \"address\" FROM \"mydb\".\"users\")SELECT * FROM \"active_users\" WHERE \"name\" = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -380,7 +380,7 @@ fn test_sqlite_with_recursive() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "WITH RECURSIVE active_users AS (SELECT *, (SELECT * FROM mydb.address WHERE city = ?) AS address FROM mydb.users)SELECT * FROM active_users WHERE name = ?";
+    let true_sql = "WITH RECURSIVE \"active_users\" AS (SELECT *, (SELECT * FROM \"mydb\".\"address\" WHERE \"city\" = ?) AS \"address\" FROM \"mydb\".\"users\")SELECT * FROM \"active_users\" WHERE \"name\" = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -414,7 +414,7 @@ fn test_sqlite_union() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users WHERE name = ? UNION SELECT * FROM mydb.users";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" WHERE \"name\" = ? UNION SELECT * FROM \"mydb\".\"users\"";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, vec![Value::String("John".to_string()),]);
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -442,7 +442,7 @@ fn test_sqlite_union_all() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users WHERE name = ? UNION ALL SELECT * FROM mydb.users";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" WHERE \"name\" = ? UNION ALL SELECT * FROM \"mydb\".\"users\"";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, vec![Value::String("John".to_string()),]);
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -461,7 +461,7 @@ fn test_sqlite_limit_offset() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users LIMIT 20, 10";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" LIMIT 20, 10";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, Vec::<Value>::new());
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -479,7 +479,7 @@ fn test_sqlite_group_by() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users GROUP BY department, status";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" GROUP BY \"department\", \"status\"";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, Vec::<Value>::new());
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -497,7 +497,7 @@ fn test_sqlite_group_by_raw() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users GROUP BY department, status";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" GROUP BY department, status";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, Vec::<Value>::new());
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -516,7 +516,7 @@ fn test_sqlite_order_by() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users ORDER BY name ASC, age DESC";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" ORDER BY \"name\" ASC, \"age\" DESC";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, Vec::<Value>::new());
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -534,7 +534,7 @@ fn test_sqlite_order_by_raw() {
         });
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
-    let true_sql = "SELECT * FROM mydb.users ORDER BY name ASC, age DESC";
+    let true_sql = "SELECT * FROM \"mydb\".\"users\" ORDER BY name ASC, age DESC";
     assert_eq!(sql.0, true_sql);
     assert_eq!(sql.1, Vec::<Value>::new());
     assert_eq!(to_sqlx.sql(), true_sql);
@@ -556,7 +556,7 @@ fn test_sqlite_table_raw() {
     let sql = builder.to_sql();
     let to_sqlx = builder.to_sqlx_query();
     let true_sql =
-        "SELECT * FROM (SELECT * FROM users WHERE status = ?) as active_users WHERE name = ?";
+        "SELECT * FROM (SELECT * FROM users WHERE status = ?) as active_users WHERE \"name\" = ?";
     assert_eq!(sql.0, true_sql);
     assert_eq!(
         sql.1,
@@ -588,9 +588,9 @@ fn test_sqlite_joins() {
     println!("SQLite JOIN SQL: {}", sql);
     println!("Binds: {:?}", binds);
 
-    assert!(sql.contains("SELECT users.name, profiles.bio FROM users"));
-    assert!(sql.contains("LEFT JOIN profiles ON users.id = profiles.user_id"));
-    assert!(sql.contains("WHERE users.status = ?"));
+    assert!(sql.contains("SELECT \"users\".\"name\", \"profiles\".\"bio\" FROM \"users\""));
+    assert!(sql.contains("LEFT JOIN \"profiles\" ON \"users\".\"id\" = \"profiles\".\"user_id\""));
+    assert!(sql.contains("WHERE \"users\".\"status\" = ?"));
 }
 
 #[test]
@@ -610,8 +610,8 @@ fn test_sqlite_aggregate_functions() {
     println!("SQLite Aggregate SQL: {}", sql);
     println!("Binds: {:?}", binds);
 
-    assert!(sql.contains("SELECT COUNT(id), SUM(amount), AVG(amount) FROM orders"));
-    assert!(sql.contains("GROUP BY user_id"));
+    assert!(sql.contains("SELECT COUNT(\"id\"), SUM(\"amount\"), AVG(\"amount\") FROM \"orders\""));
+    assert!(sql.contains("GROUP BY \"user_id\""));
     assert!(sql.contains("HAVING COUNT(*) > ?"));
 }
 
@@ -657,8 +657,8 @@ fn test_sqlite_with_cte() {
     println!("SQLite CTE SQL: {}", sql);
     println!("Binds: {:?}", binds);
 
-    assert!(sql.contains("WITH active_users AS ("));
-    assert!(sql.contains("SELECT * FROM active_users"));
+    assert!(sql.contains("WITH \"active_users\" AS ("));
+    assert!(sql.contains("SELECT * FROM \"active_users\""));
 }
 
 #[test]
@@ -685,5 +685,5 @@ fn test_sqlite_union_old() {
     println!("Binds: {:?}", binds);
 
     assert!(sql.contains("UNION"));
-    assert!(sql.contains("SELECT * FROM users"));
+    assert!(sql.contains("SELECT * FROM \"users\""));
 }
