@@ -116,6 +116,9 @@ pub trait HavingClauses {
 
 impl HavingClauses for QueryBuilder {
     fn having(&mut self, column: &str, operator: &str, value: Value) {
+        // NOTE: HAVING operands are expression-oriented (e.g. `COUNT(*)`), so the
+        // column is treated as a raw expression and is NOT identifier-escaped.
+        // Do not pass untrusted input here; use bound `value`s for data.
         let sql = format!("{} {} ?", column, operator);
         self.query_common
             .push(Common::Having(sql, Some(vec![value])));
@@ -127,6 +130,7 @@ impl HavingClauses for QueryBuilder {
     }
 
     fn having_between(&mut self, column: &str, values: [Value; 2]) {
+        // Expression-oriented; see `having` for the escaping rationale.
         let sql = format!("{} BETWEEN ? AND ?", column);
         self.query_common
             .push(Common::Having(sql, Some(values.to_vec())));
@@ -358,12 +362,15 @@ impl WhereClauses for QueryBuilder {
 
     fn where_ilike(&mut self, column: &str, value: Value) {
         // For MySQL, use LOWER() function
+        let column = crate::dialect::escape_identifier(column, &self.client);
         let sql = format!("LOWER({}) LIKE LOWER(?)", column);
         self.statement
             .push(crate::types::Statement::Raw((sql, Some(vec![value]))));
     }
 
     fn where_column(&mut self, lhs: &str, operator: &str, rhs: &str) {
+        let lhs = crate::dialect::escape_identifier(lhs, &self.client);
+        let rhs = crate::dialect::escape_identifier(rhs, &self.client);
         let sql = format!("{} {} {}", lhs, operator, rhs);
         self.statement
             .push(crate::types::Statement::Raw((sql, None)));
@@ -388,6 +395,7 @@ impl WhereClauses for QueryBuilder {
     }
 
     fn where_json_contains(&mut self, column: &str, value: Value) {
+        let column = crate::dialect::escape_identifier(column, &self.client);
         let sql = format!("JSON_CONTAINS({}, ?)", column);
         self.statement
             .push(crate::types::Statement::Raw((sql, Some(vec![value]))));

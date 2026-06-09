@@ -73,6 +73,9 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
     let mut order_by_raw = String::new();
     let mut order_by_raw_binds: Vec<serde_json::Value> = vec![];
 
+    // Capture the dialect before the loop: the `With` arm shadows `chain_builder`.
+    let client = chain_builder.query.client.clone();
+
     for common in chain_builder.query.query_common.iter() {
         match common {
             crate::types::Common::With(alias, recursive, chain_builder) => {
@@ -86,7 +89,7 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                     with.push_str("RECURSIVE");
                     with.push(' ');
                 }
-                with.push_str(alias.as_str());
+                with.push_str(&crate::dialect::escape_identifier(alias, &client));
                 with.push_str(" AS (");
                 let sql = merge_to_sql(to_sql(chain_builder));
                 with.push_str(sql.0.as_str());
@@ -116,7 +119,10 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                 offset = Some(*o);
             }
             crate::types::Common::GroupBy(g) => {
-                group_by.extend(g.clone());
+                group_by.extend(
+                    g.iter()
+                        .map(|col| crate::dialect::escape_identifier(col, &client)),
+                );
             }
             crate::types::Common::GroupByRaw(g, b) => {
                 group_by_raw.push_str(g.as_str());
@@ -125,7 +131,11 @@ pub fn to_sql(chain_builder: &ChainBuilder) -> ToSql {
                 }
             }
             crate::types::Common::OrderBy(column, order) => {
-                order_by.push(format!("{} {}", column, order));
+                order_by.push(format!(
+                    "{} {}",
+                    crate::dialect::escape_identifier(column, &client),
+                    order
+                ));
             }
             crate::types::Common::OrderByRaw(sql, val) => {
                 order_by_raw.push_str(sql.as_str());

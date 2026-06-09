@@ -1,9 +1,10 @@
-use crate::{builder::ChainBuilder, query::join::JoinStatement};
+use crate::{builder::ChainBuilder, dialect::escape_identifier, query::join::JoinStatement};
 use serde_json::Value;
 
 pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec<Value>) {
     let mut to_sql_str = String::new();
     let mut to_binds: Vec<serde_json::Value> = vec![];
+    let client = &chain_builder.query.client;
     for (i, join) in chain_builder.query.join.iter().enumerate() {
         if i > 0 {
             to_sql_str.push(' ');
@@ -17,12 +18,21 @@ pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec
 
         if prefix {
             let table = if let Some(db) = &chain_builder.db {
-                format!("{}.{}", db, join.table)
+                format!(
+                    "{}.{}",
+                    escape_identifier(db, client),
+                    escape_identifier(&join.table, client)
+                )
             } else {
-                join.table.clone()
+                escape_identifier(&join.table, client)
             };
             if let Some(as_name) = &join.as_name {
-                to_sql_str.push_str(&format!("{} {} as {} ON ", join.join_type, table, as_name));
+                to_sql_str.push_str(&format!(
+                    "{} {} as {} ON ",
+                    join.join_type,
+                    table,
+                    escape_identifier(as_name, client)
+                ));
             } else {
                 to_sql_str.push_str(&format!("{} {} ON ", join.join_type, table));
             }
@@ -34,7 +44,15 @@ pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec
                     if j > 0 {
                         to_sql_str.push_str(" AND ");
                     }
-                    to_sql_str.push_str(format!("{} {} {}", column, operator, column2).as_str());
+                    to_sql_str.push_str(
+                        format!(
+                            "{} {} {}",
+                            escape_identifier(column, client),
+                            operator,
+                            escape_identifier(column2, client)
+                        )
+                        .as_str(),
+                    );
                 }
                 JoinStatement::OrChain(qb) => {
                     if j > 0 {
@@ -50,7 +68,9 @@ pub fn join_compiler(chain_builder: &ChainBuilder, prefix: bool) -> (String, Vec
                     if j > 0 {
                         to_sql_str.push_str(" AND ");
                     }
-                    to_sql_str.push_str(format!("{} {} ?", column, operator).as_str());
+                    to_sql_str.push_str(
+                        format!("{} {} ?", escape_identifier(column, client), operator).as_str(),
+                    );
                     to_binds.push(value.clone());
                 }
                 JoinStatement::OnRaw(raw, binds) => {

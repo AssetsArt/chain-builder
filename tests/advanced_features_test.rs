@@ -37,10 +37,10 @@ fn test_advanced_where_clauses() {
     println!("Binds: {:?}", binds);
 
     // Basic assertions
-    assert!(sql.contains("LOWER(name) LIKE LOWER(?)"));
-    assert!(sql.contains("users.age > profiles.min_age"));
+    assert!(sql.contains("LOWER(`name`) LIKE LOWER(?)"));
+    assert!(sql.contains("`users`.`age` > `profiles`.`min_age`"));
     assert!(sql.contains("EXISTS ("));
-    assert!(sql.contains("JSON_CONTAINS(metadata, ?)"));
+    assert!(sql.contains("JSON_CONTAINS(`metadata`, ?)"));
 }
 
 #[test]
@@ -65,12 +65,12 @@ fn test_aggregate_functions() {
     println!("Binds: {:?}", binds);
 
     // Basic assertions
-    assert!(sql.contains("COUNT(id)"));
-    assert!(sql.contains("SUM(amount)"));
-    assert!(sql.contains("AVG(amount)"));
-    assert!(sql.contains("MAX(created_at)"));
-    assert!(sql.contains("MIN(created_at)"));
-    assert!(sql.contains("user_id AS uid"));
+    assert!(sql.contains("COUNT(`id`)"));
+    assert!(sql.contains("SUM(`amount`)"));
+    assert!(sql.contains("AVG(`amount`)"));
+    assert!(sql.contains("MAX(`created_at`)"));
+    assert!(sql.contains("MIN(`created_at`)"));
+    assert!(sql.contains("`user_id` AS `uid`"));
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn test_advanced_joins() {
     // Basic assertions
     assert!(sql.contains("FULL OUTER JOIN"));
     assert!(sql.contains("CROSS JOIN"));
-    assert!(sql.contains("JOIN roles USING (user_id)"));
+    assert!(sql.contains("JOIN `roles` USING (`user_id`)"));
 }
 
 #[test]
@@ -162,7 +162,7 @@ fn test_select_methods() {
     // Basic assertions
     assert!(sql.contains("SELECT DISTINCT"));
     assert!(sql.contains("CONCAT(first_name, ' ', last_name) AS full_name"));
-    assert!(sql.contains("COUNT(id)"));
-    assert!(sql.contains("SUM(points)"));
-    assert!(sql.contains("created_at AS joined_at"));
+    assert!(sql.contains("COUNT(`id`)"));
+    assert!(sql.contains("SUM(`points`)"));
+    assert!(sql.contains("`created_at` AS `joined_at`"));
 }

@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Security
+
+#### 🛡️ Identifier escaping (SQL injection hardening)
+- **Automatic identifier escaping** for the structured API. Table, column, and
+  alias names are now dialect-escaped — backticks for MySQL, double quotes for
+  SQLite/PostgreSQL — with embedded quote characters doubled. Qualified names
+  (`db.table.col`) are escaped segment-by-segment and `*` segments are preserved.
+  This neutralizes SQL injection through attacker-controlled identifiers (e.g. a
+  dynamic `ORDER BY` column from a request).
+  - Applied to: `WHERE` columns, `SELECT` columns, `[db.]table` references and
+    aliases, `INSERT`/`UPDATE` column keys, `GROUP BY` / `ORDER BY` columns,
+    `JOIN` tables/aliases/`ON` columns, CTE aliases, `where_column`,
+    `where_ilike`, `where_json_contains`, `join_using`, and the
+    `select_count/sum/avg/max/min/alias` helpers.
+  - **Not** escaped (expression/raw escape hatches, emitted verbatim — never pass
+    untrusted input): all `*_raw` methods, `table_raw`, `add_raw`, `raw_join`,
+    `on_raw`, and the `having*` helpers (which accept aggregate expressions like
+    `COUNT(*)`).
+
+#### 🧯 Denial-of-service hardening
+- `insert_many` no longer panics (index-out-of-bounds) on an empty row set.
+- `insert`, `insert_many`, and `update` no longer panic on a missing column
+  value; they bind `NULL` defensively instead. Debug `println!` calls on these
+  paths were removed.
+
 ### Changed
 
 #### ⬆️ Dependencies
@@ -10,6 +35,12 @@
     wrapped with `sqlx::AssertSqlSafe` in the `to_sqlx_query*` / `count` helpers.
   - Updated `SqliteArguments` usages for the removed lifetime parameter in sqlx 0.9.
 - Refreshed `Cargo.lock` to the latest compatible versions of all transitive deps.
+
+### ⚠️ Breaking change
+- Generated SQL now quotes identifiers. Pass **bare** names to the structured API
+  (`"name"`, not `` "`name`" ``); pre-quoting would be double-escaped. If you
+  relied on exact unquoted SQL output, update your expectations (or use the
+  `*_raw` methods for verbatim fragments). See the README "Security" section.
 
 ## [1.0.0] - 2025-08-10
 

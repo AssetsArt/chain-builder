@@ -37,3 +37,8 @@ required-features = ["mysql"]
 name = "sqlite_test"
 path = "tests/sqlite_test.rs"
 required-features = ["sqlite"]
+
+[[test]]
+name = "security_test"
+path = "tests/security_test.rs"
+required-features = ["mysql", "sqlite"]

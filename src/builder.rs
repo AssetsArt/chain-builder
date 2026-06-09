@@ -114,46 +114,48 @@ impl ChainBuilder {
     /// Add COUNT aggregate function
     pub fn select_count(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select
-            .push(Select::Raw(format!("COUNT({})", column), None));
+        let column = crate::dialect::escape_identifier(column, &self.client);
+        self.select.push(Select::Raw(format!("COUNT({})", column), None));
         self
     }
 
     /// Add SUM aggregate function
     pub fn select_sum(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select
-            .push(Select::Raw(format!("SUM({})", column), None));
+        let column = crate::dialect::escape_identifier(column, &self.client);
+        self.select.push(Select::Raw(format!("SUM({})", column), None));
         self
     }
 
     /// Add AVG aggregate function
     pub fn select_avg(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select
-            .push(Select::Raw(format!("AVG({})", column), None));
+        let column = crate::dialect::escape_identifier(column, &self.client);
+        self.select.push(Select::Raw(format!("AVG({})", column), None));
         self
     }
 
     /// Add MAX aggregate function
     pub fn select_max(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select
-            .push(Select::Raw(format!("MAX({})", column), None));
+        let column = crate::dialect::escape_identifier(column, &self.client);
+        self.select.push(Select::Raw(format!("MAX({})", column), None));
         self
     }
 
     /// Add MIN aggregate function
     pub fn select_min(&mut self, column: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
-        self.select
-            .push(Select::Raw(format!("MIN({})", column), None));
+        let column = crate::dialect::escape_identifier(column, &self.client);
+        self.select.push(Select::Raw(format!("MIN({})", column), None));
         self
     }
 
     /// Add SELECT with alias
     pub fn select_alias(&mut self, column: &str, alias: &str) -> &mut ChainBuilder {
         self.method = Method::Select;
+        let column = crate::dialect::escape_identifier(column, &self.client);
+        let alias = crate::dialect::escape_identifier(alias, &self.client);
         self.select
             .push(Select::Raw(format!("{} AS {}", column, alias), None));
         self
