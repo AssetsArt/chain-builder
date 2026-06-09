@@ -28,7 +28,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-chain-builder = "1.0.0"
+chain-builder = "1.0.2"
 serde_json = "1.0"
 ```
 
@@ -36,7 +36,7 @@ For MySQL with sqlx integration:
 
 ```toml
 [dependencies]
-chain-builder = { version = "1.0.0", features = ["sqlx_mysql"] }
+chain-builder = { version = "1.0.2", features = ["sqlx_mysql"] }
 sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-rustls"] }
 ```
 
@@ -44,7 +44,7 @@ For SQLite with sqlx integration:
 
 ```toml
 [dependencies]
-chain-builder = { version = "1.0.0", features = ["sqlx_sqlite"] }
+chain-builder = { version = "1.0.2", features = ["sqlx_sqlite"] }
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
 ```
 
@@ -52,7 +52,7 @@ For both MySQL and SQLite with sqlx integration:
 
 ```toml
 [dependencies]
-chain-builder = { version = "1.0.0", features = ["sqlx_mysql", "sqlx_sqlite"] }
+chain-builder = { version = "1.0.2", features = ["sqlx_mysql", "sqlx_sqlite"] }
 sqlx = { version = "0.8", features = ["mysql", "sqlite", "runtime-tokio-rustls"] }
 ```
 
