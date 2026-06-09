@@ -253,14 +253,23 @@ does for MySql (`MySqlArguments::default()` + `add`), which is `'static`-friendl
 
 ## T6 — Orchestrator final verification (Phase 6 gate)
 
-Run **all** myself (not trust subagents):
+> **Correction (found at verify time):** the combined
+> `--features v2,sqlx_mysql,sqlx_sqlite,sqlx_postgres` command does **not**
+> compile — a **pre-existing 1.x defect**: `ChainBuilder::to_sqlx_query` is defined
+> in *both* `src/sqlx_mysql.rs` and `src/sqlx_sqlite.rs`, so enabling ≥2 sqlx
+> backends at once = duplicate definitions. This is orthogonal to v2. Verify v2 sqlx
+> **per single backend** (sqlite needs `--no-default-features` because `default`
+> pulls in `sqlx_mysql`):
+
 ```
-cargo build
+cargo build                                                   # 1.x default
 cargo build --features v2
 cargo build --features v2,sqlx_postgres
-cargo test 2>&1 | tail -1                                  # 63 (1.x baseline)
-cargo test --features v2,sqlx_mysql,sqlx_sqlite,sqlx_postgres 2>&1 | tail -3
-cargo clippy --features v2 2>&1 | grep 'src/v2'            # no new v2 warnings
+cargo test 2>&1                                               # 63 (1.x baseline)
+cargo test --features v2,sqlx_postgres                         # core + pg sqlx
+cargo test --features v2,sqlx_mysql                            # core + mysql sqlx
+cargo test --no-default-features --features v2,sqlite,sqlx_sqlite  # core + sqlite sqlx
+cargo clippy --features v2 2>&1 | grep 'src/v2'               # no new v2 warnings
 ```
 Acceptance checklist from the spec must be ✓ or the gap is named in the wrap-up.
 
