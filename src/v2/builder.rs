@@ -703,6 +703,84 @@ impl<D: Dialect> QueryBuilder<D> {
         self
     }
 
+    /// Conditionally apply `f` to the builder, keeping the chain intact.
+    ///
+    /// Returns `f(self)` when `cond` is true, otherwise `self` unchanged. This
+    /// lets you add clauses based on a runtime flag without breaking the
+    /// by-value chain.
+    ///
+    /// ```
+    /// # #[cfg(feature = "v2")] {
+    /// use chain_builder::v2::{Postgres, QueryBuilder};
+    /// let only_active = true;
+    /// let (sql, _) = QueryBuilder::<Postgres>::table("users")
+    ///     .select(["id"])
+    ///     .when(only_active, |q| q.where_eq("status", "active"))
+    ///     .to_sql();
+    /// assert_eq!(sql, r#"SELECT "id" FROM "users" WHERE "status" = $1"#);
+    /// # }
+    /// ```
+    pub fn when(self, cond: bool, f: impl FnOnce(Self) -> Self) -> Self {
+        if cond {
+            f(self)
+        } else {
+            self
+        }
+    }
+
+    /// Apply `if_true` when `cond` holds, otherwise `if_false`, keeping the
+    /// chain intact.
+    ///
+    /// ```
+    /// # #[cfg(feature = "v2")] {
+    /// use chain_builder::v2::{Postgres, QueryBuilder};
+    /// let active = false;
+    /// let (sql, _) = QueryBuilder::<Postgres>::table("users")
+    ///     .select(["id"])
+    ///     .when_else(
+    ///         active,
+    ///         |q| q.where_eq("status", "active"),
+    ///         |q| q.where_eq("status", "inactive"),
+    ///     )
+    ///     .to_sql();
+    /// assert_eq!(sql, r#"SELECT "id" FROM "users" WHERE "status" = $1"#);
+    /// # }
+    /// ```
+    pub fn when_else(
+        self,
+        cond: bool,
+        if_true: impl FnOnce(Self) -> Self,
+        if_false: impl FnOnce(Self) -> Self,
+    ) -> Self {
+        if cond {
+            if_true(self)
+        } else {
+            if_false(self)
+        }
+    }
+
+    /// Apply `LIMIT`/`OFFSET` for a **1-based** page: row window
+    /// `[(page-1) * per_page, page * per_page)`.
+    ///
+    /// Equivalent to `self.limit(per_page).offset((page - 1).max(0) * per_page)`.
+    /// A `page < 1` is treated as page 1 (offset 0), so callers never get a
+    /// negative offset. SELECT-only, like [`Self::limit`] / [`Self::offset`].
+    ///
+    /// ```
+    /// # #[cfg(feature = "v2")] {
+    /// use chain_builder::v2::{Postgres, QueryBuilder, Value};
+    /// let (sql, binds) = QueryBuilder::<Postgres>::table("users")
+    ///     .select(["id"])
+    ///     .paginate(2, 10)
+    ///     .to_sql();
+    /// assert_eq!(sql, r#"SELECT "id" FROM "users" LIMIT $1 OFFSET $2"#);
+    /// assert_eq!(binds, vec![Value::I64(10), Value::I64(10)]);
+    /// # }
+    /// ```
+    pub fn paginate(self, page: i64, per_page: i64) -> Self {
+        self.limit(per_page).offset((page - 1).max(0) * per_page)
+    }
+
     /// Compile to `(sql, binds)`.
     pub fn to_sql(&self) -> (String, Vec<Value>) {
         compile(self)
