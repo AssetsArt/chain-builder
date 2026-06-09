@@ -3,7 +3,7 @@
 //! These are thin async delegations on top of the sqlx query objects already
 //! produced by [`to_sqlx_query`](QueryBuilder::to_sqlx_query) and
 //! [`to_sqlx_query_as`](QueryBuilder::to_sqlx_query_as) in
-//! [`crate::v2::sqlx_bind`]. They let any [`QueryBuilder<D>`] whose
+//! [`crate::sqlx_bind`]. They let any [`QueryBuilder<D>`] whose
 //! `D: SqlxDialect` run against a sqlx [`Executor`](sqlx::Executor) and decode
 //! rows into a `T: FromRow`, or pull a single scalar column.
 //!
@@ -11,8 +11,8 @@
 //! built SQL in `SELECT COUNT(*) FROM (<sql>) AS __cb_count`, binds the same
 //! arguments, and fetches a single `i64`.
 
-use crate::v2::builder::QueryBuilder;
-use crate::v2::sqlx_bind::SqlxDialect;
+use crate::builder::QueryBuilder;
+use crate::sqlx_bind::SqlxDialect;
 
 impl<D: SqlxDialect> QueryBuilder<D> {
     /// Fetch all rows, decoding each into `T`.
@@ -38,10 +38,7 @@ impl<D: SqlxDialect> QueryBuilder<D> {
     }
 
     /// Fetch at most one row, decoding it into `T`.
-    pub async fn fetch_optional<'e, T, E>(
-        &self,
-        executor: E,
-    ) -> Result<Option<T>, sqlx::Error>
+    pub async fn fetch_optional<'e, T, E>(&self, executor: E) -> Result<Option<T>, sqlx::Error>
     where
         T: for<'r> sqlx::FromRow<'r, <D::Database as sqlx::Database>::Row> + Send + Unpin,
         E: sqlx::Executor<'e, Database = D::Database>,

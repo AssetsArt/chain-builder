@@ -5,13 +5,13 @@
 //! counter, so Postgres yields `$1..$n` in first-appearance order (including
 //! across nested groups) while MySQL/SQLite yield `?`.
 
-use crate::v2::builder::{
+use crate::builder::{
     ConflictAction, Cte, Having, Join, JoinCond, JoinKind, Method, Order, QueryBuilder,
 };
-use crate::v2::dialect::{Dialect, UpsertStyle};
-use crate::v2::ident::escape_identifier;
-use crate::v2::value::Value;
-use crate::v2::where_::{Conj, Predicate};
+use crate::dialect::{Dialect, UpsertStyle};
+use crate::ident::escape_identifier;
+use crate::value::Value;
+use crate::where_::{Conj, Predicate};
 
 /// Accumulates the generated SQL and the ordered bind values.
 ///
@@ -216,7 +216,7 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
 /// the sorted-key list of inserted columns.
 fn write_on_conflict<D: Dialect>(
     ctx: &mut Ctx,
-    oc: &crate::v2::builder::OnConflict,
+    oc: &crate::builder::OnConflict,
     inserted: &[&str],
 ) {
     match D::upsert_style() {

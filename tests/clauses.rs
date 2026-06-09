@@ -1,6 +1,4 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{MySql, Order, Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Order, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn postgres_group_order_limit_offset() {

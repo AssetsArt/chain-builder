@@ -1,14 +1,9 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{MySql, Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn pg_insert_many_basic() {
     let (sql, binds) = QueryBuilder::<Postgres>::table("u")
-        .insert_many([
-            [("a", 1i64), ("b", 2i64)],
-            [("a", 3i64), ("b", 4i64)],
-        ])
+        .insert_many([[("a", 1i64), ("b", 2i64)], [("a", 3i64), ("b", 4i64)]])
         .to_sql();
     assert_eq!(
         sql,
@@ -24,10 +19,7 @@ fn pg_insert_many_basic() {
 fn pg_insert_many_ragged_binds_null() {
     // Second row missing "b" → that slot binds Null.
     let (sql, binds) = QueryBuilder::<Postgres>::table("u")
-        .insert_many([
-            vec![("a", 1i64), ("b", 2i64)],
-            vec![("a", 3i64)],
-        ])
+        .insert_many([vec![("a", 1i64), ("b", 2i64)], vec![("a", 3i64)]])
         .to_sql();
     assert_eq!(
         sql,
@@ -42,10 +34,7 @@ fn pg_insert_many_ragged_binds_null() {
 #[test]
 fn mysql_insert_many() {
     let (sql, binds) = QueryBuilder::<MySql>::table("u")
-        .insert_many([
-            [("a", 1i64), ("b", 2i64)],
-            [("a", 3i64), ("b", 4i64)],
-        ])
+        .insert_many([[("a", 1i64), ("b", 2i64)], [("a", 3i64), ("b", 4i64)]])
         .to_sql();
     assert_eq!(sql, "INSERT INTO `u` (`a`, `b`) VALUES (?, ?), (?, ?)");
     assert_eq!(
@@ -57,15 +46,9 @@ fn mysql_insert_many() {
 #[test]
 fn sqlite_insert_many() {
     let (sql, binds) = QueryBuilder::<Sqlite>::table("u")
-        .insert_many([
-            [("a", 1i64), ("b", 2i64)],
-            [("a", 3i64), ("b", 4i64)],
-        ])
+        .insert_many([[("a", 1i64), ("b", 2i64)], [("a", 3i64), ("b", 4i64)]])
         .to_sql();
-    assert_eq!(
-        sql,
-        r#"INSERT INTO "u" ("a", "b") VALUES (?, ?), (?, ?)"#
-    );
+    assert_eq!(sql, r#"INSERT INTO "u" ("a", "b") VALUES (?, ?), (?, ?)"#);
     assert_eq!(
         binds,
         vec![Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4)]
@@ -75,10 +58,7 @@ fn sqlite_insert_many() {
 #[test]
 fn pg_insert_many_with_on_conflict_and_returning() {
     let (sql, binds) = QueryBuilder::<Postgres>::table("u")
-        .insert_many([
-            [("a", 1i64), ("b", 2i64)],
-            [("a", 3i64), ("b", 4i64)],
-        ])
+        .insert_many([[("a", 1i64), ("b", 2i64)], [("a", 3i64), ("b", 4i64)]])
         .on_conflict_do_nothing(["a"])
         .returning(["a"])
         .to_sql();
@@ -125,10 +105,7 @@ fn sqlite_group_order_by_raw() {
         .group_by_raw("a, b", vec![])
         .order_by_raw("a DESC", vec![])
         .to_sql();
-    assert_eq!(
-        sql,
-        r#"SELECT "a" FROM "t" GROUP BY a, b ORDER BY a DESC"#
-    );
+    assert_eq!(sql, r#"SELECT "a" FROM "t" GROUP BY a, b ORDER BY a DESC"#);
     assert!(binds.is_empty());
 }
 

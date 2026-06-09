@@ -172,7 +172,10 @@ mod tests {
     #[test]
     fn strings_become_text() {
         assert_eq!("hi".into_bind(), Value::Text("hi".to_string()));
-        assert_eq!(String::from("hi").into_bind(), Value::Text("hi".to_string()));
+        assert_eq!(
+            String::from("hi").into_bind(),
+            Value::Text("hi".to_string())
+        );
         let owned = String::from("hi");
         assert_eq!((&owned).into_bind(), Value::Text("hi".to_string()));
     }

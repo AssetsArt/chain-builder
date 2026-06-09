@@ -1,6 +1,4 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{MySql, Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn when_true_adds_predicate() {
@@ -41,11 +39,7 @@ fn when_true_and_false_differ() {
 fn when_else_false_applies_false_branch() {
     let (sql, binds) = QueryBuilder::<Postgres>::table("users")
         .select(["id"])
-        .when_else(
-            false,
-            |q| q.where_eq("a", 1i64),
-            |q| q.where_eq("b", 2i64),
-        )
+        .when_else(false, |q| q.where_eq("a", 1i64), |q| q.where_eq("b", 2i64))
         .to_sql();
 
     assert_eq!(sql, r#"SELECT "id" FROM "users" WHERE "b" = $1"#);
@@ -56,11 +50,7 @@ fn when_else_false_applies_false_branch() {
 fn when_else_true_applies_true_branch() {
     let (sql, binds) = QueryBuilder::<Postgres>::table("users")
         .select(["id"])
-        .when_else(
-            true,
-            |q| q.where_eq("a", 1i64),
-            |q| q.where_eq("b", 2i64),
-        )
+        .when_else(true, |q| q.where_eq("a", 1i64), |q| q.where_eq("b", 2i64))
         .to_sql();
 
     assert_eq!(sql, r#"SELECT "id" FROM "users" WHERE "a" = $1"#);
@@ -101,10 +91,7 @@ fn when_false_mid_chain_preserves_rest_of_builder() {
         sql,
         r#"SELECT "id" FROM "users" WHERE "status" = $1 ORDER BY "created" DESC LIMIT $2"#
     );
-    assert_eq!(
-        binds,
-        vec![Value::Text("active".into()), Value::I64(5)]
-    );
+    assert_eq!(binds, vec![Value::Text("active".into()), Value::I64(5)]);
 }
 
 #[test]
@@ -114,10 +101,7 @@ fn paginate_page_2_pg() {
         .paginate(2, 10)
         .to_sql();
 
-    assert_eq!(
-        sql,
-        r#"SELECT "id" FROM "users" LIMIT $1 OFFSET $2"#
-    );
+    assert_eq!(sql, r#"SELECT "id" FROM "users" LIMIT $1 OFFSET $2"#);
     assert_eq!(binds, vec![Value::I64(10), Value::I64(10)]);
 }
 
@@ -128,10 +112,7 @@ fn paginate_page_1_offset_zero_pg() {
         .paginate(1, 10)
         .to_sql();
 
-    assert_eq!(
-        sql,
-        r#"SELECT "id" FROM "users" LIMIT $1 OFFSET $2"#
-    );
+    assert_eq!(sql, r#"SELECT "id" FROM "users" LIMIT $1 OFFSET $2"#);
     assert_eq!(binds, vec![Value::I64(10), Value::I64(0)]);
 }
 
@@ -142,10 +123,7 @@ fn paginate_page_zero_treated_as_page_one_pg() {
         .paginate(0, 10)
         .to_sql();
 
-    assert_eq!(
-        sql,
-        r#"SELECT "id" FROM "users" LIMIT $1 OFFSET $2"#
-    );
+    assert_eq!(sql, r#"SELECT "id" FROM "users" LIMIT $1 OFFSET $2"#);
     assert_eq!(binds, vec![Value::I64(10), Value::I64(0)]);
 }
 

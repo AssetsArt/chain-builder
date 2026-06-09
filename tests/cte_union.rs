@@ -1,6 +1,4 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{MySql, Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn postgres_cte_main_union_placeholder_ordering() {

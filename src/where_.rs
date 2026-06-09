@@ -3,12 +3,12 @@
 //! [`Predicate`] is the dialect-agnostic AST for a single WHERE condition.
 //! [`WhereBuilder`] is a thin accumulator used by `and_where`/`or_where` to
 //! collect a nested group of predicates without threading the whole
-//! [`QueryBuilder`](crate::v2::QueryBuilder) into the closure.
+//! [`QueryBuilder`](crate::QueryBuilder) into the closure.
 
 use core::marker::PhantomData;
 
-use crate::v2::dialect::Dialect;
-use crate::v2::value::{IntoBind, Value};
+use crate::dialect::Dialect;
+use crate::value::{IntoBind, Value};
 
 /// How a [`Predicate::Group`] attaches to the clause that precedes it.
 ///
@@ -183,7 +183,7 @@ impl<D: Dialect> WhereBuilder<D> {
     }
 
     /// `col ILIKE val` — dialect-aware case-insensitive match (see
-    /// [`QueryBuilder::where_ilike`](crate::v2::QueryBuilder::where_ilike)).
+    /// [`QueryBuilder::where_ilike`](crate::QueryBuilder::where_ilike)).
     pub fn where_ilike(mut self, col: &str, val: impl IntoBind) -> Self {
         self.preds.push(Predicate::ILike {
             col: col.to_owned(),
@@ -193,7 +193,7 @@ impl<D: Dialect> WhereBuilder<D> {
     }
 
     /// `col @> val` — JSONB containment (Postgres-oriented; see
-    /// [`QueryBuilder::where_jsonb_contains`](crate::v2::QueryBuilder::where_jsonb_contains)).
+    /// [`QueryBuilder::where_jsonb_contains`](crate::QueryBuilder::where_jsonb_contains)).
     pub fn where_jsonb_contains(mut self, col: &str, val: impl IntoBind) -> Self {
         self.preds.push(Predicate::JsonContains {
             col: col.to_owned(),

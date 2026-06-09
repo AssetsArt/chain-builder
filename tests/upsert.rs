@@ -1,6 +1,4 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{MySql, Postgres, QueryBuilder, Sqlite};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite};
 
 // ----- 1. pg merge -----
 
@@ -104,7 +102,10 @@ fn pg_returning_star() {
         .insert([("name", "x")])
         .returning(["*"])
         .to_sql();
-    assert_eq!(sql, r#"INSERT INTO "users" ("name") VALUES ($1) RETURNING *"#);
+    assert_eq!(
+        sql,
+        r#"INSERT INTO "users" ("name") VALUES ($1) RETURNING *"#
+    );
 }
 
 #[test]
@@ -127,10 +128,7 @@ fn pg_returning_delete() {
         .where_eq("id", 1i64)
         .returning(["id"])
         .to_sql();
-    assert_eq!(
-        sql,
-        r#"DELETE FROM "users" WHERE "id" = $1 RETURNING "id""#
-    );
+    assert_eq!(sql, r#"DELETE FROM "users" WHERE "id" = $1 RETURNING "id""#);
 }
 
 #[test]

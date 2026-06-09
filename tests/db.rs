@@ -1,12 +1,11 @@
 //! v2: `db("name")` database-qualified tables (multi-tenant: one connection,
 //! many databases — like 1.x `db()`). The db identifier prefixes the main table
 //! AND join tables, escaped per dialect.
-#![cfg(feature = "v2")]
 
-use chain_builder::v2::{MySql, Postgres, Sqlite};
-type Pg = chain_builder::v2::QueryBuilder<Postgres>;
-type My = chain_builder::v2::QueryBuilder<MySql>;
-type Lite = chain_builder::v2::QueryBuilder<Sqlite>;
+use chain_builder::{MySql, Postgres, Sqlite};
+type Pg = chain_builder::QueryBuilder<Postgres>;
+type My = chain_builder::QueryBuilder<MySql>;
+type Lite = chain_builder::QueryBuilder<Sqlite>;
 
 #[test]
 fn postgres_db_qualifies_select_table() {
@@ -49,7 +48,11 @@ fn db_qualifies_insert_update_delete() {
         r#"UPDATE "t1"."users" SET "name" = $1 WHERE "id" = $2"#
     );
 
-    let (del, _) = Pg::table("users").db("t1").delete().where_eq("id", 1i64).to_sql();
+    let (del, _) = Pg::table("users")
+        .db("t1")
+        .delete()
+        .where_eq("id", 1i64)
+        .to_sql();
     assert_eq!(del, r#"DELETE FROM "t1"."users" WHERE "id" = $1"#);
 }
 
