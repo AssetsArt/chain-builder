@@ -1033,10 +1033,38 @@ impl<D: Dialect> QueryBuilder<D> {
     /// For aggregate expressions like `COUNT(*) > ?`, use [`Self::having_raw`].
     /// SELECT-only: ignored for INSERT/UPDATE/DELETE. Multiple HAVING terms are
     /// joined by `AND`.
+    ///
+    /// # Operator allowlist (injection guard)
+    ///
+    /// Unlike `where_eq`/`where_column`/`JoinClause::on`, which take
+    /// `op: &'static str` (so only compile-time literals are accepted), this
+    /// method takes `op: &str` for ergonomics. Because `op` is emitted
+    /// **verbatim** into the SQL (it is not a bound value and cannot be escaped
+    /// without changing its meaning), an attacker-controlled operator would be a
+    /// SQL-injection vector. To prevent that, `op` is validated against a fixed
+    /// set of comparison operators and a disallowed operator **panics**
+    /// (fail-loud, like the `offset`/`distinct_on`/lock guards). The operator is
+    /// matched case-insensitively and stored trimmed. For anything outside this
+    /// set — arbitrary aggregate expressions, custom operators — use
+    /// [`Self::having_raw`], the documented verbatim escape hatch.
+    ///
+    /// Allowed: `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`, `LIKE`, `NOT LIKE`.
     pub fn having(mut self, col: &str, op: &str, val: impl IntoBind) -> Self {
+        const ALLOWED_HAVING_OPS: &[&str] =
+            &["=", "!=", "<>", ">", ">=", "<", "<=", "LIKE", "NOT LIKE"];
+        let normalized = op.trim();
+        if !ALLOWED_HAVING_OPS
+            .iter()
+            .any(|allowed| allowed.eq_ignore_ascii_case(normalized))
+        {
+            panic!(
+                "having() operator {op:?} is not an allowed comparison operator \
+                 (use having_raw() for arbitrary aggregate expressions)"
+            );
+        }
         self.havings.push(Having::Col {
             col: col.to_owned(),
-            op: op.to_owned(),
+            op: normalized.to_owned(),
             val: val.into_bind(),
         });
         self
