@@ -61,6 +61,24 @@ pub enum Predicate {
         /// Upper bound.
         hi: Value,
     },
+    /// `col ILIKE val` — dialect-aware case-insensitive match.
+    ///
+    /// Postgres emits native `{col} ILIKE {ph}`; MySQL/SQLite emit
+    /// `LOWER({col}) LIKE LOWER({ph})`. Dispatched in `compile::write_pred`.
+    ILike {
+        /// Raw identifier; escaped in compile.rs.
+        col: String,
+        /// Bound value.
+        val: Value,
+    },
+    /// `col @> val` — JSONB containment (Postgres-oriented; `@>` emitted
+    /// verbatim for all dialects).
+    JsonContains {
+        /// Raw identifier; escaped in compile.rs.
+        col: String,
+        /// Bound value (JSON text or `Value::Json`).
+        val: Value,
+    },
     /// Raw SQL fragment with its own binds, emitted verbatim.
     Raw {
         /// Verbatim SQL.
@@ -162,6 +180,26 @@ impl<D: Dialect> WhereBuilder<D> {
     /// `col LIKE val`.
     pub fn where_like(self, col: &str, val: impl IntoBind) -> Self {
         self.binary(col, "LIKE", val)
+    }
+
+    /// `col ILIKE val` — dialect-aware case-insensitive match (see
+    /// [`QueryBuilder::where_ilike`](crate::v2::QueryBuilder::where_ilike)).
+    pub fn where_ilike(mut self, col: &str, val: impl IntoBind) -> Self {
+        self.preds.push(Predicate::ILike {
+            col: col.to_owned(),
+            val: val.into_bind(),
+        });
+        self
+    }
+
+    /// `col @> val` — JSONB containment (Postgres-oriented; see
+    /// [`QueryBuilder::where_jsonb_contains`](crate::v2::QueryBuilder::where_jsonb_contains)).
+    pub fn where_jsonb_contains(mut self, col: &str, val: impl IntoBind) -> Self {
+        self.preds.push(Predicate::JsonContains {
+            col: col.to_owned(),
+            val: val.into_bind(),
+        });
+        self
     }
 
     fn in_(mut self, col: &str, neg: bool, vals: impl IntoIterator<Item = impl IntoBind>) -> Self {
