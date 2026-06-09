@@ -19,4 +19,12 @@ impl Dialect for Postgres {
     fn supports_returning() -> bool {
         true
     }
+
+    fn supports_distinct_on() -> bool {
+        true
+    }
+
+    fn ilike_is_native() -> bool {
+        true
+    }
 }

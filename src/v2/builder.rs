@@ -194,6 +194,10 @@ pub struct QueryBuilder<D: Dialect> {
     /// When set, prefixes the main table and join tables: `"db"."table"`.
     pub(crate) db: Option<String>,
     pub(crate) select_cols: Vec<String>,
+    /// `SELECT DISTINCT` flag (raw; off by default for M1 byte-identity).
+    pub(crate) distinct: bool,
+    /// `SELECT DISTINCT ON (cols)` columns (raw; Postgres-only).
+    pub(crate) distinct_on: Vec<String>,
     pub(crate) wheres: Vec<Predicate>,
     pub(crate) method: Method,
     pub(crate) set: Vec<(String, Value)>,
@@ -219,6 +223,8 @@ impl<D: Dialect> QueryBuilder<D> {
             table: name.to_owned(),
             db: None,
             select_cols: Vec::new(),
+            distinct: false,
+            distinct_on: Vec::new(),
             wheres: Vec::new(),
             method: Method::Select,
             set: Vec::new(),
@@ -253,6 +259,54 @@ impl<D: Dialect> QueryBuilder<D> {
         S: AsRef<str>,
     {
         self.select_cols = cols.into_iter().map(|c| c.as_ref().to_owned()).collect();
+        self
+    }
+
+    /// Emit `SELECT DISTINCT …` (all dialects).
+    pub fn distinct(mut self) -> Self {
+        self.distinct = true;
+        self
+    }
+
+    /// Emit `SELECT DISTINCT ON (cols) …` — **Postgres only**.
+    ///
+    /// `cols` are raw identifiers (escaped at compile time). Compiling against a
+    /// dialect without `DISTINCT ON` support panics
+    /// (`DISTINCT ON requires PostgreSQL`).
+    pub fn distinct_on<I, S>(mut self, cols: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.distinct_on = cols.into_iter().map(|c| c.as_ref().to_owned()).collect();
+        self.distinct = true;
+        self
+    }
+
+    /// `col ILIKE val` — dialect-aware case-insensitive match.
+    ///
+    /// On **Postgres** this compiles to the native `{col} ILIKE {ph}`. On
+    /// MySQL/SQLite (no native `ILIKE`) it compiles to
+    /// `LOWER({col}) LIKE LOWER({ph})`.
+    pub fn where_ilike(mut self, col: &str, val: impl IntoBind) -> Self {
+        self.wheres.push(Predicate::ILike {
+            col: col.to_owned(),
+            val: val.into_bind(),
+        });
+        self
+    }
+
+    /// `col @> val` — JSONB containment.
+    ///
+    /// **Postgres-specific:** the `@>` operator is emitted verbatim for all
+    /// dialects, but is only meaningful on Postgres `jsonb` columns. `val` is
+    /// typically a JSON text string (or `Value::Json` behind the `json`
+    /// feature).
+    pub fn where_jsonb_contains(mut self, col: &str, val: impl IntoBind) -> Self {
+        self.wheres.push(Predicate::JsonContains {
+            col: col.to_owned(),
+            val: val.into_bind(),
+        });
         self
     }
 

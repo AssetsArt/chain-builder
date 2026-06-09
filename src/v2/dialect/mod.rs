@@ -44,6 +44,20 @@ pub trait Dialect: Sized + Send + Sync + 'static {
     fn upsert_style() -> UpsertStyle {
         UpsertStyle::OnConflict
     }
+
+    /// Whether this dialect supports `SELECT DISTINCT ON (cols)`. Defaults to
+    /// `false`; only Postgres overrides to `true`. Compiling a `distinct_on`
+    /// query against a dialect that returns `false` panics.
+    fn supports_distinct_on() -> bool {
+        false
+    }
+
+    /// Whether this dialect has a native case-insensitive `ILIKE` operator.
+    /// Defaults to `false`; only Postgres overrides to `true`. When `false`,
+    /// `where_ilike` is compiled as `LOWER(col) LIKE LOWER(?)`.
+    fn ilike_is_native() -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

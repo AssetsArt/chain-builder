@@ -74,7 +74,19 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
         Method::Select => {
             // CTEs are emitted first so their binds (and pg `$N`) come first.
             write_ctes::<D>(ctx, &qb.ctes);
-            ctx.sql.push_str("SELECT ");
+            if !qb.distinct_on.is_empty() {
+                if !D::supports_distinct_on() {
+                    panic!("DISTINCT ON requires PostgreSQL");
+                }
+                ctx.sql.push_str("SELECT DISTINCT ON (");
+                let cols: Vec<String> = qb.distinct_on.iter().map(|c| ctx.esc(c)).collect();
+                ctx.sql.push_str(&cols.join(", "));
+                ctx.sql.push_str(") ");
+            } else if qb.distinct {
+                ctx.sql.push_str("SELECT DISTINCT ");
+            } else {
+                ctx.sql.push_str("SELECT ");
+            }
             if qb.select_cols.is_empty() {
                 ctx.sql.push('*');
             } else {
@@ -489,6 +501,29 @@ fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate) {
             ctx.placeholder::<D>(lo.clone());
             ctx.sql.push_str(" AND ");
             ctx.placeholder::<D>(hi.clone());
+        }
+        Predicate::ILike { col, val } => {
+            let col = ctx.esc(col);
+            if D::ilike_is_native() {
+                // Postgres: native `col ILIKE $n`.
+                ctx.sql.push_str(&col);
+                ctx.sql.push_str(" ILIKE ");
+                ctx.placeholder::<D>(val.clone());
+            } else {
+                // MySQL/SQLite: `LOWER(col) LIKE LOWER(?)`.
+                ctx.sql.push_str("LOWER(");
+                ctx.sql.push_str(&col);
+                ctx.sql.push_str(") LIKE LOWER(");
+                ctx.placeholder::<D>(val.clone());
+                ctx.sql.push(')');
+            }
+        }
+        Predicate::JsonContains { col, val } => {
+            // Postgres-oriented `@>` (jsonb contains); emitted verbatim.
+            let col = ctx.esc(col);
+            ctx.sql.push_str(&col);
+            ctx.sql.push_str(" @> ");
+            ctx.placeholder::<D>(val.clone());
         }
         Predicate::Raw { sql, binds } => {
             // Verbatim escape hatch: SQL is NOT escaped (see `where_raw` docs).
