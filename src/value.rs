@@ -41,6 +41,11 @@ pub enum Value {
     /// Naive time of day (requires the `chrono` feature).
     #[cfg(feature = "chrono")]
     NaiveTime(chrono::NaiveTime),
+    /// Fixed-point decimal for money/exact-numeric columns (requires the
+    /// `decimal` feature). Bound natively on Postgres/MySQL (`NUMERIC`/`DECIMAL`)
+    /// and as TEXT on SQLite (which has no native decimal type).
+    #[cfg(feature = "decimal")]
+    Decimal(rust_decimal::Decimal),
 }
 
 /// Conversion of a Rust value into a bound [`Value`].
@@ -179,6 +184,13 @@ impl IntoBind for chrono::NaiveDate {
 impl IntoBind for chrono::NaiveTime {
     fn into_bind(self) -> Value {
         Value::NaiveTime(self)
+    }
+}
+
+#[cfg(feature = "decimal")]
+impl IntoBind for rust_decimal::Decimal {
+    fn into_bind(self) -> Value {
+        Value::Decimal(self)
     }
 }
 

@@ -21,6 +21,8 @@ parameters, automatic identifier escaping, dialect-correct placeholders
 - **Full query surface** — SELECT/INSERT/UPDATE/DELETE, WHERE (+ `or`/`and` groups),
   JOINs, CTEs (`WITH`/`RECURSIVE`), `UNION`, GROUP BY/HAVING/ORDER BY, LIMIT/OFFSET.
 - **Upsert + RETURNING** — `on_conflict_merge`/`_do_nothing`, dialect-correct.
+- **Row locking** — `for_update`/`for_share` + `skip_locked`/`no_wait` (no-op on SQLite).
+- **Aggregates** — `select_count`/`sum`/`avg`/`min`/`max` (+ `_as`) and `select_as`.
 - **`db()` qualification** — multi-tenant (one connection, many databases).
 - **Typed fetch** — `fetch_all::<T>`/`fetch_one`/`count`/`fetch_scalar` via `sqlx`.
 - **Dynamic** — `when`/`when_else`, `paginate`, `distinct`/`distinct_on`, `ilike`, jsonb.
@@ -102,6 +104,9 @@ never pass untrusted input through them.
 - **`sqlx_sqlite`** — SQLite driver + `SqlxDialect for Sqlite`
 - **`sqlx_postgres`** — PostgreSQL driver + `SqlxDialect for Postgres`
 - **`json`** — `Value::Json` + `IntoBind for serde_json::Value`
+- **`uuid`** — `Value::Uuid` + `IntoBind for uuid::Uuid`
+- **`chrono`** — date/time `Value` variants + `IntoBind` for `chrono` types
+- **`decimal`** — `Value::Decimal` + `IntoBind for rust_decimal::Decimal`
 
 The query builder (`to_sql()`) works with **no** driver feature; a driver feature is
 only needed for the `sqlx` handoff (`to_sqlx_query`, `fetch_*`). All three drivers

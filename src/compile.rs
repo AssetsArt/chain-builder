@@ -6,7 +6,8 @@
 //! across nested groups) while MySQL/SQLite yield `?`.
 
 use crate::builder::{
-    ConflictAction, Cte, Having, Join, JoinCond, JoinKind, Method, Order, QueryBuilder,
+    ConflictAction, Cte, Having, Join, JoinCond, JoinKind, Lock, LockStrength, LockWait, Method,
+    Order, QueryBuilder, SelectExpr,
 };
 use crate::dialect::{Dialect, UpsertStyle};
 use crate::ident::escape_identifier;
@@ -97,6 +98,7 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             write_order_by(ctx, &qb.orders, qb.order_by_raw.as_ref());
             write_limit_offset::<D>(ctx, qb.limit, qb.offset);
             write_unions::<D>(ctx, &qb.unions);
+            write_lock::<D>(ctx, qb.lock.as_ref());
         }
         Method::Insert => {
             if qb.set.is_empty() && qb.insert_rows.is_empty() {
@@ -306,7 +308,11 @@ fn write_group_by(ctx: &mut Ctx, groups: &[String], raw: Option<&(String, Vec<Va
 /// Written directly into `ctx` (not pre-joined) so subquery binds continue the
 /// placeholder counter in emission order.
 fn write_select_list<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
-    if qb.select_cols.is_empty() && qb.select_raw.is_empty() && qb.select_subqueries.is_empty() {
+    if qb.select_cols.is_empty()
+        && qb.select_exprs.is_empty()
+        && qb.select_raw.is_empty()
+        && qb.select_subqueries.is_empty()
+    {
         ctx.sql.push('*');
         return;
     }
@@ -317,6 +323,38 @@ fn write_select_list<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
         }
         let e = ctx.esc(c);
         ctx.sql.push_str(&e);
+        wrote_any = true;
+    }
+    for expr in &qb.select_exprs {
+        if wrote_any {
+            ctx.sql.push_str(", ");
+        }
+        match expr {
+            SelectExpr::Agg { func, col, alias } => {
+                ctx.sql.push_str(func.as_str());
+                ctx.sql.push('(');
+                // A `*` column is emitted unescaped (`COUNT(*)`).
+                if col == "*" {
+                    ctx.sql.push('*');
+                } else {
+                    let c = ctx.esc(col);
+                    ctx.sql.push_str(&c);
+                }
+                ctx.sql.push(')');
+                if let Some(a) = alias {
+                    let a = ctx.esc(a);
+                    ctx.sql.push_str(" AS ");
+                    ctx.sql.push_str(&a);
+                }
+            }
+            SelectExpr::ColAs { col, alias } => {
+                let c = ctx.esc(col);
+                let a = ctx.esc(alias);
+                ctx.sql.push_str(&c);
+                ctx.sql.push_str(" AS ");
+                ctx.sql.push_str(&a);
+            }
+        }
         wrote_any = true;
     }
     for (sql, binds) in &qb.select_raw {
@@ -498,6 +536,29 @@ fn write_limit_offset<D: Dialect>(ctx: &mut Ctx, limit: Option<i64>, offset: Opt
     if let Some(n) = offset {
         ctx.sql.push_str(" OFFSET ");
         ctx.placeholder::<D>(Value::I64(n));
+    }
+}
+
+/// Render a row-locking clause (` FOR UPDATE`/` FOR SHARE` [+ ` SKIP LOCKED`/
+/// ` NOWAIT`]) at the end of a `SELECT`. A **no-op on dialects without row
+/// locking** (SQLite), so the lock is silently dropped there rather than
+/// producing invalid SQL.
+fn write_lock<D: Dialect>(ctx: &mut Ctx, lock: Option<&Lock>) {
+    let Some(lock) = lock else {
+        return;
+    };
+    if !D::supports_row_locking() {
+        return;
+    }
+    ctx.sql.push_str(match lock.strength {
+        LockStrength::Update => " FOR UPDATE",
+        LockStrength::Share => " FOR SHARE",
+    });
+    if let Some(wait) = lock.wait {
+        ctx.sql.push_str(match wait {
+            LockWait::SkipLocked => " SKIP LOCKED",
+            LockWait::NoWait => " NOWAIT",
+        });
     }
 }
 
