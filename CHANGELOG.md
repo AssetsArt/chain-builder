@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.0.0] - 2026-06-09
+
+### ⚠️ Breaking — complete rewrite ("Knex for Rust")
+
+v2 is now the crate root; the 1.x API is **removed**. The builder is a ground-up
+redesign — there is no in-place migration path; rewrite call sites against the new
+API (see [README](README.md) / [docs/guide.md](docs/guide.md)).
+
+### Added / Changed
+
+- **`Dialect`-generic builder** `QueryBuilder<D>` over `Postgres` / `MySql` /
+  `Sqlite` — mixing dialects is a compile error; dialect-correct placeholders
+  (`$N` vs `?`) and identifier quoting in one place.
+- **Typed binds** via `IntoBind` + internal `Value` enum (`serde_json::Value`
+  removed from the core API; available behind the `json` feature).
+- **All three sqlx drivers can be enabled simultaneously** — the 1.x limitation
+  (duplicate `to_sqlx_query` defs across `sqlx_mysql`/`sqlx_sqlite`) is gone.
+- Full surface: SELECT/INSERT/UPDATE/DELETE, WHERE (+ `or_where`/`and_where`
+  groups, `ilike`, jsonb `@>`), JOINs, CTEs (`with`/`with_recursive`),
+  `UNION`/`UNION ALL`, GROUP BY/HAVING/ORDER BY, LIMIT/OFFSET, `distinct`/
+  `distinct_on`, `db()` qualification, upsert (`on_conflict_merge`/`_do_nothing`)
+  + `RETURNING`, multi-row `insert_many`, `when`/`when_else`, `paginate`, raw
+  escape hatches, and typed fetch (`fetch_all`/`one`/`optional`/`count`/`scalar`).
+- Injection-safe by construction: identifiers always escaped, values always bound.
+
+### Removed
+
+- The entire 1.x API: `ChainBuilder`, `Client`, `Select`, `Statement`, the
+  `WhereClauses`/`QueryCommon`/`HavingClauses`/`JoinMethods` traits, and the
+  `mysql`/`sqlite`/`postgres`/`v2`/`dev-dependencies` cargo features.
+- `serde` dependency (unused); `serde_json` is now optional (`json` feature).
+
+### Features
+
+`default = ["sqlx_mysql"]`; opt into `sqlx_sqlite`, `sqlx_postgres`, `json`.
+
 ## [1.0.2] - 2026-06-09
 
 ### Security

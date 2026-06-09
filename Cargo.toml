@@ -1,44 +1,34 @@
 [package]
 name = "chain-builder"
-version = "1.0.2"
+version = "2.0.0"
 edition = "2021"
-description = "A query builder for MySQL for Rust is designed to be flexible and easy to use."
+description = "A typed, dialect-aware SQL query builder for Rust (PostgreSQL/MySQL/SQLite) — Knex-style."
 license = "MIT"
 readme = "README.md"
-keywords = ["database", "mysql", "query", "builder", "rust"]
+keywords = ["database", "sql", "query", "builder", "sqlx"]
 categories = ["database", "database-implementations"]
 repository = "https://github.com/AssetsArt/chain-builder.git"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 sqlx = { version = "0.9" }
+serde_json = { version = "1", optional = true }
+uuid = { version = "1", optional = true }
+chrono = { version = "0.4", optional = true, default-features = false, features = ["clock"] }
 
 [dev-dependencies]
-chain-builder = { path = ".", default-features = false, features = ["dev-dependencies"] }
+sqlx = { version = "0.9", features = ["mysql", "sqlite", "postgres", "runtime-tokio", "tls-rustls"] }
+tokio = { version = "1", features = ["rt", "macros"] }
 
 [features]
-default = ["mysql", "sqlx_mysql"]
+default = ["sqlx_mysql"]
 sqlx_mysql = ["sqlx/mysql"]
 sqlx_sqlite = ["sqlx/sqlite"]
-mysql = []
-postgres = []
-sqlite = []
-dev-dependencies = ["mysql", "sqlite"]
-
-
-[[test]]
-name = "mysql_test"
-path = "tests/mysql_test.rs"
-required-features = ["mysql"]
-
-[[test]]
-name = "sqlite_test"
-path = "tests/sqlite_test.rs"
-required-features = ["sqlite"]
-
-[[test]]
-name = "security_test"
-path = "tests/security_test.rs"
-required-features = ["mysql", "sqlite"]
+sqlx_postgres = ["sqlx/postgres"]
+json = ["dep:serde_json"]
+uuid = ["dep:uuid", "sqlx/uuid"]
+chrono = ["dep:chrono", "sqlx/chrono"]

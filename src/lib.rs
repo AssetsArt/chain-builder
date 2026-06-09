@@ -1,59 +1,64 @@
-//! Chain Builder - A flexible and easy-to-use query builder for MySQL in Rust
+//! # Chain Builder
 //!
-//! This library provides a fluent interface for building SQL queries with support for:
-//! - SELECT, INSERT, UPDATE, DELETE operations
-//! - Complex WHERE clauses with subqueries
-//! - JOIN operations
-//! - WITH clauses (CTEs)
-//! - UNION operations
-//! - Raw SQL support
+//! A typed, dialect-aware SQL query builder for Rust — "Knex for Rust".
+//!
+//! Generic over a [`Dialect`] (PostgreSQL / MySQL / SQLite), with typed bind
+//! parameters via [`IntoBind`], dialect-correct placeholders (`$N` for Postgres,
+//! `?` for MySQL/SQLite), automatic identifier escaping, and an optional `sqlx`
+//! handoff for execution.
 //!
 //! # Example
 //! ```rust
-//! use chain_builder::{ChainBuilder, Client, Select, WhereClauses};
-//! use serde_json::Value;
+//! use chain_builder::{QueryBuilder, Postgres, Order};
 //!
-//! let mut builder = ChainBuilder::new(Client::Mysql);
-//! builder
-//!     .db("mydb")
-//!     .select(Select::Columns(vec!["*".into()]))
-//!     .table("users")
-//!     .query(|qb| {
-//!         qb.where_eq("name", Value::String("John".to_string()));
-//!         qb.where_eq("status", Value::String("active".to_string()));
-//!     });
+//! let (sql, binds) = QueryBuilder::<Postgres>::table("users")
+//!     .db("mydb")                       // multi-tenant: one connection, many DBs
+//!     .select(["id", "name"])
+//!     .where_eq("status", "active")
+//!     .where_in("role", ["admin", "staff"])
+//!     .order_by("name", Order::Desc)
+//!     .paginate(2, 20)
+//!     .to_sql();
 //!
-//! let (sql, binds) = builder.to_sql();
+//! assert!(sql.starts_with(r#"SELECT "id", "name" FROM "mydb"."users""#));
+//! assert_eq!(binds.len(), 5); // active, admin, staff, limit, offset
 //! ```
+//!
+//! With a dialect's `sqlx_*` feature enabled, [`QueryBuilder::to_sqlx_query`] and
+//! the `fetch_*` helpers turn a builder into a ready-to-execute `sqlx` query.
 
-// Core modules
-mod builder;
-mod common;
-mod dialect;
-mod query;
-mod types;
+pub mod builder;
+pub mod compile;
+pub mod dialect;
+pub mod ident;
+pub mod value;
+pub mod where_;
 
-// Database-specific modules
-#[cfg(feature = "mysql")]
-mod mysql;
-#[cfg(feature = "sqlite")]
-mod sqlite;
-#[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
-mod sqlx_mysql;
-#[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
-mod sqlx_sqlite;
+#[cfg(any(
+    feature = "sqlx_mysql",
+    feature = "sqlx_sqlite",
+    feature = "sqlx_postgres"
+))]
+pub mod fetch;
+#[cfg(any(
+    feature = "sqlx_mysql",
+    feature = "sqlx_sqlite",
+    feature = "sqlx_postgres"
+))]
+pub mod sqlx_bind;
 
-// Re-export main types
-pub use builder::ChainBuilder;
-pub use query::{Operator, QueryBuilder};
-pub use types::{Client, Common, Method, Select, Statement};
+pub use builder::{
+    ConflictAction, Cte, Having, Join, JoinClause, JoinCond, JoinKind, Method, OnConflict, Order,
+    QueryBuilder,
+};
+pub use compile::compile;
+pub use dialect::{Dialect, MySql, Postgres, Sqlite, UpsertStyle};
+pub use value::{IntoBind, Value};
+pub use where_::{Conj, Predicate, WhereBuilder};
 
-// Re-export database-specific types
-#[cfg(feature = "mysql")]
-pub use mysql::ToSql;
-
-// Re-export join functionality
-pub use query::join::{JoinBuilder, JoinMethods};
-
-// Re-export query builder functionality
-pub use query::common::{HavingClauses, QueryCommon, WhereClauses};
+#[cfg(any(
+    feature = "sqlx_mysql",
+    feature = "sqlx_sqlite",
+    feature = "sqlx_postgres"
+))]
+pub use sqlx_bind::SqlxDialect;
