@@ -40,6 +40,15 @@ impl Ctx {
     fn esc(&self, ident: &str) -> String {
         escape_identifier(ident, self.quote)
     }
+
+    /// Escape a table, optionally prefixed by a database qualifier:
+    /// `Some("db")`, `"t"` → `"db"."t"`; `None` → `"t"`.
+    fn qualify(&self, db: Option<&str>, table: &str) -> String {
+        match db {
+            Some(d) => format!("{}.{}", self.esc(d), self.esc(table)),
+            None => self.esc(table),
+        }
+    }
 }
 
 /// Compile a [`QueryBuilder`] into `(sql, binds)`.
@@ -57,7 +66,7 @@ pub fn compile<D: Dialect>(qb: &QueryBuilder<D>) -> (String, Vec<Value>) {
 /// placeholder counter. This is the single-pass core used by [`compile`] (and,
 /// in later M2 tasks, by nested builders such as CTEs/UNION arms).
 fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
-    let table = ctx.esc(&qb.table);
+    let table = ctx.qualify(qb.db.as_deref(), &qb.table);
 
     match qb.method {
         Method::Select => {
@@ -72,7 +81,7 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             }
             ctx.sql.push_str(" FROM ");
             ctx.sql.push_str(&table);
-            write_joins::<D>(ctx, &qb.joins);
+            write_joins::<D>(ctx, &qb.joins, qb.db.as_deref());
             write_wheres::<D>(ctx, &qb.wheres);
             write_group_by(ctx, &qb.groups);
             write_having::<D>(ctx, &qb.havings);
@@ -141,7 +150,7 @@ fn write_group_by(ctx: &mut Ctx, groups: &[String]) {
 /// Render each `JOIN` (SELECT only): ` {KIND} {esc table}[ ON cond AND …]`.
 /// `CROSS JOIN` emits no `ON`. Placeholders from `OnVal`/`OnRaw` continue the
 /// running counter.
-fn write_joins<D: Dialect>(ctx: &mut Ctx, joins: &[Join]) {
+fn write_joins<D: Dialect>(ctx: &mut Ctx, joins: &[Join], db: Option<&str>) {
     for j in joins {
         let kw = match j.kind {
             JoinKind::Inner => " INNER JOIN ",
@@ -151,7 +160,7 @@ fn write_joins<D: Dialect>(ctx: &mut Ctx, joins: &[Join]) {
             JoinKind::Cross => " CROSS JOIN ",
         };
         ctx.sql.push_str(kw);
-        let table = ctx.esc(&j.table);
+        let table = ctx.qualify(db, &j.table);
         ctx.sql.push_str(&table);
         if j.on.is_empty() {
             continue;
