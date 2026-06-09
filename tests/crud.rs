@@ -1,6 +1,4 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{IntoBind, Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{IntoBind, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn sqlite_insert_sorts_keys() {

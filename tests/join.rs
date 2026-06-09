@@ -1,6 +1,4 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{MySql, Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn postgres_inner_and_left_join_with_on() {

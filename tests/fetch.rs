@@ -6,12 +6,11 @@
 //! never run; the `#[test]` only needs to exist so the module is built under its
 //! backend feature. Live DB integration is deferred to a runtime/CI task (needs a
 //! sqlx runtime feature + an async executor).
-#![cfg(feature = "v2")]
 
 #[cfg(feature = "sqlx_postgres")]
 #[allow(dead_code)]
 mod pg {
-    use chain_builder::v2::{Postgres, QueryBuilder};
+    use chain_builder::{Postgres, QueryBuilder};
 
     #[derive(sqlx::FromRow)]
     struct UserRow {
@@ -50,7 +49,7 @@ mod pg {
 #[cfg(feature = "sqlx_mysql")]
 #[allow(dead_code)]
 mod mysql {
-    use chain_builder::v2::{MySql, QueryBuilder};
+    use chain_builder::{MySql, QueryBuilder};
 
     #[derive(sqlx::FromRow)]
     struct UserRow {
@@ -89,7 +88,7 @@ mod mysql {
 #[cfg(feature = "sqlx_sqlite")]
 #[allow(dead_code)]
 mod sqlite {
-    use chain_builder::v2::{QueryBuilder, Sqlite};
+    use chain_builder::{QueryBuilder, Sqlite};
 
     #[derive(sqlx::FromRow)]
     struct UserRow {

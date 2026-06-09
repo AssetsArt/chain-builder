@@ -1,158 +1,112 @@
 # Chain Builder
 
-[![Documentation](https://img.shields.io/badge/docs.rs-chain--builder-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white)](https://docs.rs/chain-builder)
 [![Version](https://img.shields.io/crates/v/chain-builder?style=for-the-badge)](https://crates.io/crates/chain-builder)
-[![License](https://img.shields.io/crates/l/chain-builder?style=for-the-badge)](https://crates.io/crates/chain-builder)
+[![License](https://img.shields.io/crates/l/chain-builder?style=for-the-badge)](LICENSE)
 
-A flexible and easy-to-use query builder for MySQL and SQLite in Rust. This library provides a fluent interface for building SQL queries with support for complex operations like JOINs, CTEs, and subqueries.
+A **typed, dialect-aware SQL query builder** for Rust — "Knex for Rust".
+
+Generic over a `Dialect` (**PostgreSQL / MySQL / SQLite**), with typed bind
+parameters, automatic identifier escaping, dialect-correct placeholders
+(`$N` for Postgres, `?` for MySQL/SQLite), and an `sqlx` handoff for execution.
+
+> **v2.0** is a ground-up redesign. Upgrading from 1.x? See [CHANGELOG](CHANGELOG.md)
+> — the API is entirely new (typed binds, `Dialect`-generic, no `serde_json::Value`
+> in the core).
 
 ## Features
 
-- **Fluent API**: Chain methods for intuitive query building
-- **Type Safety**: Compile-time safety with Rust's type system
-- **Multi-Database Support**: MySQL and SQLite with dedicated compilers
-- **Complex Queries**: Support for JOINs, CTEs, UNIONs, and subqueries
-- **Advanced WHERE Clauses**: EXISTS, NOT EXISTS, ILIKE, column comparisons, JSON operations
-- **HAVING Clauses**: Support for aggregate function filtering
-- **Aggregate Functions**: COUNT, SUM, AVG, MAX, MIN with aliases
-- **Advanced JOINs**: FULL OUTER JOIN, CROSS JOIN, JOIN USING
-- **Raw SQL**: Fallback to raw SQL when needed
-- **Multiple Operations**: SELECT, INSERT, UPDATE, DELETE
-- **Injection-safe identifiers**: Table/column/alias names are dialect-escaped automatically (see [Security](#security))
-- **sqlx Integration**: Direct integration with sqlx for async database operations
-- **Modern Architecture**: Clean, modular codebase with better maintainability
+- **Dialect-generic** — one builder, three dialects; mixing them is a compile error.
+- **Typed binds** — pass real Rust values (`i64`, `&str`, `Option<T>`, …) via `IntoBind`.
+- **Injection-safe** — identifiers always escaped, values always bound.
+- **Full query surface** — SELECT/INSERT/UPDATE/DELETE, WHERE (+ `or`/`and` groups),
+  JOINs, CTEs (`WITH`/`RECURSIVE`), `UNION`, GROUP BY/HAVING/ORDER BY, LIMIT/OFFSET.
+- **Upsert + RETURNING** — `on_conflict_merge`/`_do_nothing`, dialect-correct.
+- **`db()` qualification** — multi-tenant (one connection, many databases).
+- **Typed fetch** — `fetch_all::<T>`/`fetch_one`/`count`/`fetch_scalar` via `sqlx`.
+- **Dynamic** — `when`/`when_else`, `paginate`, `distinct`/`distinct_on`, `ilike`, jsonb.
 
 ## Installation
 
-Add this to your `Cargo.toml`:
-
 ```toml
 [dependencies]
-chain-builder = "1.0.2"
-serde_json = "1.0"
+# pick the driver(s) you need; the builder itself is driver-agnostic
+chain-builder = { version = "2", features = ["sqlx_postgres"] }
+sqlx = { version = "0.9", features = ["postgres", "runtime-tokio-rustls"] }
 ```
 
-For MySQL with sqlx integration:
-
-```toml
-[dependencies]
-chain-builder = { version = "1.0.2", features = ["sqlx_mysql"] }
-sqlx = { version = "0.9", features = ["mysql", "runtime-tokio-rustls"] }
-```
-
-For SQLite with sqlx integration:
-
-```toml
-[dependencies]
-chain-builder = { version = "1.0.2", features = ["sqlx_sqlite"] }
-sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio-rustls"] }
-```
-
-For both MySQL and SQLite with sqlx integration:
-
-```toml
-[dependencies]
-chain-builder = { version = "1.0.2", features = ["sqlx_mysql", "sqlx_sqlite"] }
-sqlx = { version = "0.9", features = ["mysql", "sqlite", "runtime-tokio-rustls"] }
-```
+Driver features: `sqlx_mysql` (default), `sqlx_sqlite`, `sqlx_postgres` — enable any
+combination. `json` enables `Value::Json`.
 
 ## Quick Start
 
-### MySQL Example
-
 ```rust
-use chain_builder::{ChainBuilder, Client, Select};
-use serde_json::Value;
+use chain_builder::{QueryBuilder, Postgres, Order};
 
-// Create a new query builder for MySQL
-let mut builder = ChainBuilder::new(Client::Mysql);
-
-// Build a simple SELECT query
-builder
+let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .db("mydb")
-    .select(Select::Columns(vec!["*".into()]))
-    .table("users")
-    .query(|qb| {
-        qb.where_eq("name", Value::String("John".to_string()));
-        qb.where_eq("status", Value::String("active".to_string()));
-    });
-
-// Generate SQL
-let (sql, binds) = builder.to_sql();
-println!("SQL: {}", sql);
-println!("Binds: {:?}", binds);
+    .select(["id", "name"])
+    .where_eq("status", "active")
+    .where_in("role", ["admin", "staff"])
+    .order_by("created_at", Order::Desc)
+    .paginate(2, 20)
+    .to_sql();
+// SELECT "id", "name" FROM "mydb"."users"
+//   WHERE "status" = $1 AND "role" IN ($2, $3)
+//   ORDER BY "created_at" DESC LIMIT $4 OFFSET $5
 ```
 
-### SQLite Example
+```rust
+// upsert + RETURNING
+use chain_builder::{QueryBuilder, Postgres};
+let q = QueryBuilder::<Postgres>::table("users")
+    .insert([("email", "a@b.c"), ("name", "A")])
+    .on_conflict_merge(["email"])
+    .returning(["id"]);
+// INSERT INTO "users" ("email", "name") VALUES ($1, $2)
+//   ON CONFLICT ("email") DO UPDATE SET "name" = EXCLUDED."name" RETURNING "id"
+
+// execute with sqlx (feature sqlx_postgres)
+// let rows: Vec<UserRow> = q.fetch_all(&pool).await?;
+```
+
+Same builder, different dialect → MySQL backticks + `?`:
 
 ```rust
-use chain_builder::{ChainBuilder, Client, Select};
-use serde_json::Value;
-
-// Create a new query builder for SQLite
-let mut builder = ChainBuilder::new(Client::Sqlite);
-
-// Build a simple SELECT query
-builder
-    .select(Select::Columns(vec!["*".into()]))
-    .table("users")
-    .query(|qb| {
-        qb.where_eq("name", Value::String("John".to_string()));
-        qb.where_eq("status", Value::String("active".to_string()));
-    });
-
-// Generate SQL
-let (sql, binds) = builder.to_sql();
-println!("SQL: {}", sql);
-println!("Binds: {:?}", binds);
+use chain_builder::{QueryBuilder, MySql};
+QueryBuilder::<MySql>::table("users").select(["id"]).where_eq("status", "active");
+// SELECT `id` FROM `users` WHERE `status` = ?
 ```
 
 ## Documentation
 
-- **[Guide](docs/guide.md)** — full examples (SELECT/INSERT/UPDATE/DELETE, JOINs, CTEs, UNION, aggregates & HAVING), sqlx integration, API reference, and architecture for the stable **1.x** API.
-- **[v2 preview](docs/v2.md)** — the typed, dialect-generic builder (`feature = "v2"`): typed binds, `db()` multi-tenant, upsert + RETURNING, typed fetch, and more.
+- **[Guide](docs/guide.md)** — full reference: every WHERE/JOIN/CTE/UNION/aggregate
+  method, upsert & RETURNING, typed fetch, dynamic building, and the `Dialect`/
+  `IntoBind` model.
 
 ## Security
 
-Chain Builder is designed to be safe against SQL injection on **two** axes:
+Two axes of SQL-injection safety:
 
-- **Values** are always sent as bound parameters (`?`), never inlined into SQL.
-- **Identifiers** (table, column, and alias names) passed to the structured API
-  are automatically escaped for the active dialect — backticks for MySQL,
-  double quotes for SQLite/PostgreSQL — with any embedded quote character doubled.
-  Qualified names like `users.id` are escaped segment-by-segment
-  (`` `users`.`id` ``) and a `*` segment is preserved (`` `users`.* ``).
-
-This means you can safely pass an untrusted column name (e.g. a dynamic
-`ORDER BY` coming from a request) without it being able to break out of the
-identifier context:
-
-```rust
-// "name`; DROP TABLE users; --" becomes a single quoted identifier:
-//   ... ORDER BY `name``; DROP TABLE users; --` ASC
-qb.order_by(user_supplied_column, "ASC");
-```
-
-> **Pass bare identifiers.** Do **not** pre-quote names yourself (e.g. `` "`name`" ``);
-> the builder quotes them for you, and a pre-quoted name would be double-escaped.
+- **Values** are always sent as bound parameters (`?` / `$N`), never inlined.
+- **Identifiers** (table/column/alias names) are dialect-escaped automatically;
+  qualified names (`users.id`) are escaped segment-by-segment (`"users"."id"`),
+  `*` preserved. **Pass bare names** — do not pre-quote (it would be double-escaped).
 
 The `*_raw` methods (`select_raw`, `where_raw`, `group_by_raw`, `order_by_raw`,
-`having_raw`, `add_raw`, `table_raw`, `raw_join`, `on_raw`) and the `having*`
-helpers are **expression** escape hatches and are emitted verbatim — never pass
-untrusted input through them.
+`on_raw`, `having_raw`) and the `having*` helpers are verbatim escape hatches —
+never pass untrusted input through them.
 
 ## Feature Flags
 
-The library uses feature flags to control functionality:
+- **`sqlx_mysql`** (default) — MySQL driver + `SqlxDialect for MySql`
+- **`sqlx_sqlite`** — SQLite driver + `SqlxDialect for Sqlite`
+- **`sqlx_postgres`** — PostgreSQL driver + `SqlxDialect for Postgres`
+- **`json`** — `Value::Json` + `IntoBind for serde_json::Value`
 
-- **`mysql`** (default) - Enable MySQL support
-- **`sqlite`** - Enable SQLite support
-- **`sqlx_mysql`** (default) - Enable MySQL sqlx integration
-- **`sqlx_sqlite`** - Enable SQLite sqlx integration
-- **`sqlx_postgres`** - Enable PostgreSQL sqlx integration (v2)
-- **`postgres`** - Enable PostgreSQL support (future, 1.x)
-- **`v2`** - Enable the typed, dialect-generic v2 builder (preview)
-- **`json`** - Enable `v2::Value::Json` (v2)
+The query builder (`to_sql()`) works with **no** driver feature; a driver feature is
+only needed for the `sqlx` handoff (`to_sqlx_query`, `fetch_*`). All three drivers
+can be enabled simultaneously.
 
 ## License
 
+MIT License - see [LICENSE](LICENSE) for details.

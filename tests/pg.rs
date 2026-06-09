@@ -1,6 +1,4 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{MySql, Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite, Value};
 
 // ---------------------------------------------------------------------------
 // DISTINCT / DISTINCT ON
@@ -74,7 +72,10 @@ fn sqlite_ilike() {
         .select(["a"])
         .where_ilike("name", "%jo%")
         .to_sql();
-    assert_eq!(sql, r#"SELECT "a" FROM "t" WHERE LOWER("name") LIKE LOWER(?)"#);
+    assert_eq!(
+        sql,
+        r#"SELECT "a" FROM "t" WHERE LOWER("name") LIKE LOWER(?)"#
+    );
     assert_eq!(binds, vec![Value::Text("%jo%".to_string())]);
 }
 

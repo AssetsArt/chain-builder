@@ -1,6 +1,4 @@
-#![cfg(feature = "v2")]
-
-use chain_builder::v2::{MySql, Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn postgres_select_with_wheres() {
@@ -137,7 +135,10 @@ fn null_predicates_have_no_binds() {
         .where_null("a")
         .where_not_null("b")
         .to_sql();
-    assert_eq!(sql, r#"SELECT * FROM "t" WHERE "a" IS NULL AND "b" IS NOT NULL"#);
+    assert_eq!(
+        sql,
+        r#"SELECT * FROM "t" WHERE "a" IS NULL AND "b" IS NOT NULL"#
+    );
     assert!(binds.is_empty());
 }
 
@@ -194,10 +195,7 @@ fn injection_column_is_neutralized() {
     let (sql, _) = QueryBuilder::<Postgres>::table("users")
         .select([r#"id" ; DROP TABLE users; --"#])
         .to_sql();
-    assert_eq!(
-        sql,
-        r#"SELECT "id"" ; DROP TABLE users; --" FROM "users""#
-    );
+    assert_eq!(sql, r#"SELECT "id"" ; DROP TABLE users; --" FROM "users""#);
 }
 
 #[test]

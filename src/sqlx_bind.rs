@@ -10,16 +10,16 @@
 //! These mirror the 1.x `value_to_arguments` / `to_sqlx_query` integration in
 //! `src/sqlx_mysql.rs` and `src/sqlx_sqlite.rs`.
 
-use crate::v2::builder::QueryBuilder;
-use crate::v2::dialect::Dialect;
-use crate::v2::value::Value;
+use crate::builder::QueryBuilder;
+use crate::dialect::Dialect;
+use crate::value::Value;
 
 #[cfg(feature = "sqlx_mysql")]
-use crate::v2::dialect::MySql;
+use crate::dialect::MySql;
 #[cfg(feature = "sqlx_postgres")]
-use crate::v2::dialect::Postgres;
+use crate::dialect::Postgres;
 #[cfg(feature = "sqlx_sqlite")]
-use crate::v2::dialect::Sqlite;
+use crate::dialect::Sqlite;
 
 /// Sealed sub-trait carrying the sqlx binding for a dialect.
 ///
@@ -31,18 +31,14 @@ pub trait SqlxDialect: Dialect + private::Sealed {
     /// The database's owned `Arguments` must be `IntoArguments<Self::Database>`
     /// (it always is for sqlx's built-in databases) so the produced query type
     /// is executable.
-    type Database: sqlx::Database<
-        Arguments: sqlx::IntoArguments<Self::Database>,
-    >;
+    type Database: sqlx::Database<Arguments: sqlx::IntoArguments<Self::Database>>;
 
     /// Build owned `Arguments` for `binds`.
     ///
     /// Mirrors 1.x `value_to_arguments`: each [`Value`] is appended with
     /// `arguments.add(..)`. The sqlx encoders for this M1 [`Value`] set are
     /// infallible, so the `add` result is discarded with `let _ =`.
-    fn bind_arguments(
-        binds: &[Value],
-    ) -> <Self::Database as sqlx::Database>::Arguments;
+    fn bind_arguments(binds: &[Value]) -> <Self::Database as sqlx::Database>::Arguments;
 }
 
 mod private {
@@ -50,11 +46,11 @@ mod private {
     pub trait Sealed {}
 
     #[cfg(feature = "sqlx_postgres")]
-    impl Sealed for crate::v2::dialect::Postgres {}
+    impl Sealed for crate::dialect::Postgres {}
     #[cfg(feature = "sqlx_mysql")]
-    impl Sealed for crate::v2::dialect::MySql {}
+    impl Sealed for crate::dialect::MySql {}
     #[cfg(feature = "sqlx_sqlite")]
-    impl Sealed for crate::v2::dialect::Sqlite {}
+    impl Sealed for crate::dialect::Sqlite {}
 }
 
 #[cfg(feature = "sqlx_postgres")]
