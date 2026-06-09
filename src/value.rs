@@ -26,6 +26,21 @@ pub enum Value {
     /// JSON value (requires the `json` feature).
     #[cfg(feature = "json")]
     Json(serde_json::Value),
+    /// UUID (requires the `uuid` feature).
+    #[cfg(feature = "uuid")]
+    Uuid(uuid::Uuid),
+    /// Timezone-aware timestamp in UTC (requires the `chrono` feature).
+    #[cfg(feature = "chrono")]
+    DateTimeUtc(chrono::DateTime<chrono::Utc>),
+    /// Naive (timezone-less) date and time (requires the `chrono` feature).
+    #[cfg(feature = "chrono")]
+    NaiveDateTime(chrono::NaiveDateTime),
+    /// Naive date (requires the `chrono` feature).
+    #[cfg(feature = "chrono")]
+    NaiveDate(chrono::NaiveDate),
+    /// Naive time of day (requires the `chrono` feature).
+    #[cfg(feature = "chrono")]
+    NaiveTime(chrono::NaiveTime),
 }
 
 /// Conversion of a Rust value into a bound [`Value`].
@@ -129,6 +144,41 @@ impl<T: IntoBind> IntoBind for Option<T> {
 impl IntoBind for serde_json::Value {
     fn into_bind(self) -> Value {
         Value::Json(self)
+    }
+}
+
+#[cfg(feature = "uuid")]
+impl IntoBind for uuid::Uuid {
+    fn into_bind(self) -> Value {
+        Value::Uuid(self)
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl IntoBind for chrono::DateTime<chrono::Utc> {
+    fn into_bind(self) -> Value {
+        Value::DateTimeUtc(self)
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl IntoBind for chrono::NaiveDateTime {
+    fn into_bind(self) -> Value {
+        Value::NaiveDateTime(self)
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl IntoBind for chrono::NaiveDate {
+    fn into_bind(self) -> Value {
+        Value::NaiveDate(self)
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl IntoBind for chrono::NaiveTime {
+    fn into_bind(self) -> Value {
+        Value::NaiveTime(self)
     }
 }
 

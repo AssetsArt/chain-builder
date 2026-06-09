@@ -86,6 +86,26 @@ impl SqlxDialect for Postgres {
                     // Match 1.x: store JSON as text.
                     let _ = arguments.add(serde_json::to_string(j).unwrap_or_default());
                 }
+                #[cfg(feature = "uuid")]
+                Value::Uuid(u) => {
+                    let _ = arguments.add(*u);
+                }
+                #[cfg(feature = "chrono")]
+                Value::DateTimeUtc(dt) => {
+                    let _ = arguments.add(*dt);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveDateTime(dt) => {
+                    let _ = arguments.add(*dt);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveDate(d) => {
+                    let _ = arguments.add(*d);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveTime(t) => {
+                    let _ = arguments.add(*t);
+                }
             }
         }
         arguments
@@ -124,6 +144,26 @@ impl SqlxDialect for MySql {
                 Value::Json(j) => {
                     // Match 1.x: store JSON as text.
                     let _ = arguments.add(serde_json::to_string(j).unwrap_or_default());
+                }
+                #[cfg(feature = "uuid")]
+                Value::Uuid(u) => {
+                    let _ = arguments.add(*u);
+                }
+                #[cfg(feature = "chrono")]
+                Value::DateTimeUtc(dt) => {
+                    let _ = arguments.add(*dt);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveDateTime(dt) => {
+                    let _ = arguments.add(*dt);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveDate(d) => {
+                    let _ = arguments.add(*d);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveTime(t) => {
+                    let _ = arguments.add(*t);
                 }
             }
         }
@@ -165,6 +205,26 @@ impl SqlxDialect for Sqlite {
                 Value::Json(j) => {
                     // Match 1.x: store JSON as text.
                     let _ = arguments.add(serde_json::to_string(j).unwrap_or_default());
+                }
+                #[cfg(feature = "uuid")]
+                Value::Uuid(u) => {
+                    let _ = arguments.add(*u);
+                }
+                #[cfg(feature = "chrono")]
+                Value::DateTimeUtc(dt) => {
+                    let _ = arguments.add(*dt);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveDateTime(dt) => {
+                    let _ = arguments.add(*dt);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveDate(d) => {
+                    let _ = arguments.add(*d);
+                }
+                #[cfg(feature = "chrono")]
+                Value::NaiveTime(t) => {
+                    let _ = arguments.add(*t);
                 }
             }
         }
