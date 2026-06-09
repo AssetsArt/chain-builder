@@ -13,6 +13,8 @@ repository = "https://github.com/AssetsArt/chain-builder.git"
 [dependencies]
 sqlx = { version = "0.9" }
 serde_json = { version = "1", optional = true }
+uuid = { version = "1", optional = true }
+chrono = { version = "0.4", optional = true, default-features = false, features = ["clock"] }
 
 [dev-dependencies]
 sqlx = { version = "0.9", features = ["mysql", "sqlite", "postgres"] }
@@ -23,3 +25,5 @@ sqlx_mysql = ["sqlx/mysql"]
 sqlx_sqlite = ["sqlx/sqlite"]
 sqlx_postgres = ["sqlx/postgres"]
 json = ["dep:serde_json"]
+uuid = ["dep:uuid", "sqlx/uuid"]
+chrono = ["dep:chrono", "sqlx/chrono"]
