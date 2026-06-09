@@ -26,6 +26,9 @@
 //! let (sql, binds) = builder.to_sql();
 //! ```
 
+#[cfg(feature = "v2")]
+pub mod v2;
+
 // Core modules
 mod builder;
 mod common;
