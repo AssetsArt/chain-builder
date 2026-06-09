@@ -8,7 +8,7 @@ pub mod compile;
 #[cfg(any(feature = "sqlx_mysql", feature = "sqlx_sqlite", feature = "sqlx_postgres"))]
 pub mod sqlx_bind;
 
-pub use builder::{Method, QueryBuilder};
+pub use builder::{Cte, Having, Join, JoinClause, JoinCond, JoinKind, Method, Order, QueryBuilder};
 pub use compile::compile;
 pub use dialect::{Dialect, MySql, Postgres, Sqlite};
 pub use value::{IntoBind, Value};
