@@ -12,4 +12,6 @@ pub use builder::{Method, QueryBuilder};
 pub use compile::compile;
 pub use dialect::{Dialect, MySql, Postgres, Sqlite};
 pub use value::{IntoBind, Value};
+#[cfg(any(feature = "sqlx_mysql", feature = "sqlx_sqlite", feature = "sqlx_postgres"))]
+pub use sqlx_bind::SqlxDialect;
 pub use where_::{Conj, Predicate, WhereBuilder};
