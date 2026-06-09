@@ -535,6 +535,54 @@ The `*_raw` methods (`select_raw`, `where_raw`, `group_by_raw`, `order_by_raw`,
 helpers are **expression** escape hatches and are emitted verbatim — never pass
 untrusted input through them.
 
+## v2 — typed, dialect-generic builder (preview, `feature = "v2"`)
+
+A ground-up redesign toward a "Knex for Rust" query builder is available behind the
+**`v2`** feature flag (off by default; the 1.x API above is unchanged). It is
+generic over a `Dialect` (PostgreSQL / MySQL / SQLite), takes **typed binds** via
+`IntoBind` (no `serde_json::Value` in the core), emits dialect-correct placeholders
+(`$N` for Postgres, `?` for MySQL/SQLite), and hands off to `sqlx`.
+
+```toml
+chain-builder = { version = "...", features = ["v2", "sqlx_postgres"] }
+```
+
+```rust
+use chain_builder::v2::{QueryBuilder, Postgres, Order};
+
+let (sql, binds) = QueryBuilder::<Postgres>::table("users")
+    .db("mydb")                              // multi-tenant: one connection, many DBs
+    .select(["id", "name"])
+    .left_join("orders", |j| j.on("users.id", "=", "orders.user_id"))
+    .where_eq("status", "active")
+    .where_in("role", ["admin", "staff"])
+    .group_by(["users.id"])
+    .order_by("name", Order::Desc)
+    .paginate(2, 20)                          // LIMIT/OFFSET
+    .to_sql();
+
+// upsert + RETURNING
+QueryBuilder::<Postgres>::table("users")
+    .insert([("email", "a@b.c"), ("name", "A")])
+    .on_conflict_merge(["email"])             // ON CONFLICT (...) DO UPDATE SET ... = EXCLUDED...
+    .returning(["id"]);
+
+// async typed fetch (with an sqlx executor)
+// let rows: Vec<UserRow> = qb.fetch_all(&pool).await?;
+```
+
+**Implemented (M1–M7):** SELECT/INSERT/UPDATE/DELETE, full WHERE (eq/ne/cmp/in/
+null/between/like/ilike/raw + `and_where`/`or_where` groups), JOINs, CTEs
+(`with`/`with_recursive`), `UNION`/`UNION ALL`, GROUP BY/HAVING/ORDER BY,
+LIMIT/OFFSET, `distinct`/`distinct_on`, jsonb `@>`, `db()` qualification, upsert
+(`on_conflict_merge`/`_do_nothing`) + `RETURNING`, multi-row `insert_many`,
+`when`/`when_else` + `paginate`, and typed `fetch_*`/`count`/`fetch_scalar`.
+Identifiers are always escaped; values always bound.
+
+**Not yet (deferred):** live-DB integration tests (need a sqlx runtime), uuid/
+chrono/decimal `Value` variants, JSON path operators, named-constraint upsert
+targets. When v2 reaches parity it becomes the crate root in `2.0.0`.
+
 ## Feature Flags
 
 The library uses feature flags to control functionality:
@@ -543,7 +591,10 @@ The library uses feature flags to control functionality:
 - **`sqlite`** - Enable SQLite support
 - **`sqlx_mysql`** (default) - Enable MySQL sqlx integration
 - **`sqlx_sqlite`** - Enable SQLite sqlx integration
-- **`postgres`** - Enable PostgreSQL support (future)
+- **`sqlx_postgres`** - Enable PostgreSQL sqlx integration (v2)
+- **`postgres`** - Enable PostgreSQL support (future, 1.x)
+- **`v2`** - Enable the typed, dialect-generic v2 builder (preview)
+- **`json`** - Enable `v2::Value::Json` (v2)
 
 ## License
 
