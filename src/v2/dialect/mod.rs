@@ -13,6 +13,18 @@ pub use mysql::MySql;
 pub use postgres::Postgres;
 pub use sqlite::Sqlite;
 
+/// How a dialect expresses an upsert (`INSERT … ON CONFLICT`).
+///
+/// Postgres and SQLite use `ON CONFLICT (...)` clauses, while MySQL uses
+/// `ON DUPLICATE KEY UPDATE` / `INSERT IGNORE`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpsertStyle {
+    /// Postgres / SQLite: `ON CONFLICT (...) DO {NOTHING|UPDATE SET …}`.
+    OnConflict,
+    /// MySQL: `ON DUPLICATE KEY UPDATE …` and `INSERT IGNORE`.
+    OnDuplicateKey,
+}
+
 /// Compile-time description of a SQL dialect.
 pub trait Dialect: Sized + Send + Sync + 'static {
     /// The identifier quote character (e.g. backtick for MySQL, `"` for ANSI).
@@ -25,6 +37,13 @@ pub trait Dialect: Sized + Send + Sync + 'static {
 
     /// Whether this dialect supports the `RETURNING` clause.
     fn supports_returning() -> bool;
+
+    /// How this dialect expresses an upsert. Defaults to
+    /// [`UpsertStyle::OnConflict`] (Postgres / SQLite); MySQL overrides to
+    /// [`UpsertStyle::OnDuplicateKey`].
+    fn upsert_style() -> UpsertStyle {
+        UpsertStyle::OnConflict
+    }
 }
 
 #[cfg(test)]

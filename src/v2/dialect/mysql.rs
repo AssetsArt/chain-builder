@@ -1,6 +1,6 @@
 //! MySQL dialect marker.
 
-use super::Dialect;
+use super::{Dialect, UpsertStyle};
 
 /// MySQL dialect marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,5 +17,9 @@ impl Dialect for MySql {
 
     fn supports_returning() -> bool {
         false
+    }
+
+    fn upsert_style() -> UpsertStyle {
+        UpsertStyle::OnDuplicateKey
     }
 }
