@@ -71,6 +71,14 @@ pub fn compile<D: Dialect>(qb: &QueryBuilder<D>) -> (String, Vec<Value>) {
 fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
     let table = ctx.qualify(qb.db.as_deref(), &qb.table);
 
+    // A row lock is only meaningful on SELECT. Attaching one to INSERT/UPDATE/
+    // DELETE would otherwise be silently dropped — a dangerous no-op for a lock
+    // (the caller believes rows are locked when they are not). Fail loud,
+    // dialect-independent, like the `offset`/`distinct_on` guards.
+    if qb.lock.is_some() && qb.method != Method::Select {
+        panic!("for_update()/for_share() is only valid on SELECT");
+    }
+
     match qb.method {
         Method::Select => {
             // CTEs are emitted first so their binds (and pg `$N`) come first.
@@ -98,7 +106,7 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             write_order_by(ctx, &qb.orders, qb.order_by_raw.as_ref());
             write_limit_offset::<D>(ctx, qb.limit, qb.offset);
             write_unions::<D>(ctx, &qb.unions);
-            write_lock::<D>(ctx, qb.lock.as_ref());
+            write_lock::<D>(ctx, qb.lock.as_ref(), !qb.unions.is_empty());
         }
         Method::Insert => {
             if qb.set.is_empty() && qb.insert_rows.is_empty() {
@@ -542,13 +550,20 @@ fn write_limit_offset<D: Dialect>(ctx: &mut Ctx, limit: Option<i64>, offset: Opt
 /// Render a row-locking clause (` FOR UPDATE`/` FOR SHARE` [+ ` SKIP LOCKED`/
 /// ` NOWAIT`]) at the end of a `SELECT`. A **no-op on dialects without row
 /// locking** (SQLite), so the lock is silently dropped there rather than
-/// producing invalid SQL.
-fn write_lock<D: Dialect>(ctx: &mut Ctx, lock: Option<&Lock>) {
+/// producing invalid SQL. Panics if a lock is combined with `UNION` on a
+/// locking dialect (Postgres/MySQL reject that combination).
+fn write_lock<D: Dialect>(ctx: &mut Ctx, lock: Option<&Lock>, has_unions: bool) {
     let Some(lock) = lock else {
         return;
     };
     if !D::supports_row_locking() {
         return;
+    }
+    // Postgres/MySQL reject `FOR UPDATE`/`FOR SHARE` on a `UNION` result; emitting
+    // it would produce invalid SQL, so fail loud here. (No-op dialects returned
+    // above never reach this, so a SQLite lock+UNION stays a harmless no-op.)
+    if has_unions {
+        panic!("for_update()/for_share() cannot be combined with UNION");
     }
     ctx.sql.push_str(match lock.strength {
         LockStrength::Update => " FOR UPDATE",

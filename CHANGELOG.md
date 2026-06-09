@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.1] - 2026-06-09
+
+### Changed
+
+- **Row locking now fails loud on misuse** instead of silently doing the wrong
+  thing (scrutinize follow-up to 2.1.0):
+  - A lock (`for_update`/`for_share`) attached to a non-`SELECT` statement now
+    **panics** at compile time. Previously it was silently dropped — a dangerous
+    no-op for a lock (the caller believes rows are locked when they are not).
+  - A lock combined with `UNION` on a locking dialect (Postgres/MySQL) now
+    **panics** rather than emitting SQL those engines reject. SQLite (which
+    no-ops locks entirely) is unaffected — lock+UNION stays a harmless no-op there.
+  Both guards match the existing `offset`-without-`limit` / `distinct_on`
+  panics. Valid `SELECT` locking is unchanged.
+
 ## [2.1.0] - 2026-06-09
 
 ### Added

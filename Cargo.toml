@@ -1,6 +1,6 @@
 [package]
 name = "chain-builder"
-version = "2.1.0"
+version = "2.1.1"
 edition = "2021"
 description = "A typed, dialect-aware SQL query builder for Rust (PostgreSQL/MySQL/SQLite)."
 license = "MIT"
