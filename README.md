@@ -37,7 +37,7 @@ For MySQL with sqlx integration:
 ```toml
 [dependencies]
 chain-builder = { version = "1.0.2", features = ["sqlx_mysql"] }
-sqlx = { version = "0.8", features = ["mysql", "runtime-tokio-rustls"] }
+sqlx = { version = "0.9", features = ["mysql", "runtime-tokio-rustls"] }
 ```
 
 For SQLite with sqlx integration:
@@ -45,7 +45,7 @@ For SQLite with sqlx integration:
 ```toml
 [dependencies]
 chain-builder = { version = "1.0.2", features = ["sqlx_sqlite"] }
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls"] }
+sqlx = { version = "0.9", features = ["sqlite", "runtime-tokio-rustls"] }
 ```
 
 For both MySQL and SQLite with sqlx integration:
@@ -53,7 +53,7 @@ For both MySQL and SQLite with sqlx integration:
 ```toml
 [dependencies]
 chain-builder = { version = "1.0.2", features = ["sqlx_mysql", "sqlx_sqlite"] }
-sqlx = { version = "0.8", features = ["mysql", "sqlite", "runtime-tokio-rustls"] }
+sqlx = { version = "0.9", features = ["mysql", "sqlite", "runtime-tokio-rustls"] }
 ```
 
 ## Quick Start
