@@ -5,10 +5,10 @@ use sqlx::{self, sqlite::SqliteArguments, Arguments};
 impl ChainBuilder {
     /// Build SQL + args for SQLite (use with sqlx::query_with(&sql, args))
     #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
-    pub fn to_sqlx_parts_sqlite(&mut self) -> (String, SqliteArguments<'static>) {
+    pub fn to_sqlx_parts_sqlite(&mut self) -> (String, SqliteArguments) {
         let (sql, binds) = self.to_sql();
-        // ระบุ lifetime ให้ชัดเจน
-        let mut args: SqliteArguments<'static> = SqliteArguments::default();
+        // sqlx 0.9 removed the lifetime parameter from SqliteArguments
+        let mut args: SqliteArguments = SqliteArguments::default();
 
         for bind in binds {
             push_sqlite_arg(&mut args, bind);
@@ -20,25 +20,33 @@ impl ChainBuilder {
     #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
     pub fn to_sqlx_query(
         &mut self,
-    ) -> sqlx::query::Query<'_, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'_>> {
+    ) -> sqlx::query::Query<'_, sqlx::Sqlite, sqlx::sqlite::SqliteArguments> {
         let (_, binds) = self.to_sql();
-        sqlx::query_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
+        // sqlx 0.9 requires `SqlSafeStr`; the SQL is builder-generated with bound
+        // parameters, so assert safety explicitly (also satisfies the 'static bound).
+        sqlx::query_with(
+            sqlx::AssertSqlSafe(self.sql_str.clone()),
+            self.value_to_arguments(&binds),
+        )
     }
 
     #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
     pub fn to_sqlx_query_as<T>(
         &mut self,
-    ) -> sqlx::query::QueryAs<'_, sqlx::Sqlite, T, sqlx::sqlite::SqliteArguments<'_>>
+    ) -> sqlx::query::QueryAs<'_, sqlx::Sqlite, T, sqlx::sqlite::SqliteArguments>
     where
         T: for<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow>,
     {
         let (_, binds) = self.to_sql();
-        sqlx::query_as_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
+        sqlx::query_as_with(
+            sqlx::AssertSqlSafe(self.sql_str.clone()),
+            self.value_to_arguments(&binds),
+        )
     }
 
     #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
-    fn value_to_arguments(&self, binds: &Vec<Value>) -> SqliteArguments<'static> {
-        let mut arguments: SqliteArguments<'static> = SqliteArguments::default();
+    fn value_to_arguments(&self, binds: &Vec<Value>) -> SqliteArguments {
+        let mut arguments: SqliteArguments = SqliteArguments::default();
         for bind in binds {
             push_sqlite_arg(&mut arguments, bind.clone());
         }
@@ -47,7 +55,7 @@ impl ChainBuilder {
 }
 
 #[cfg(all(feature = "sqlite", feature = "sqlx_sqlite"))]
-fn push_sqlite_arg<'a>(arguments: &mut SqliteArguments<'a>, v: Value) {
+fn push_sqlite_arg(arguments: &mut SqliteArguments, v: Value) {
     match v {
         Value::Null => {
             // bind NULL อย่างชัดเจน

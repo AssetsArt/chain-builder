@@ -52,7 +52,12 @@ impl ChainBuilder {
         &mut self,
     ) -> sqlx::query::Query<'_, sqlx::MySql, sqlx::mysql::MySqlArguments> {
         let (_, binds) = self.to_sql();
-        sqlx::query_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
+        // sqlx 0.9 requires `SqlSafeStr`; the SQL is builder-generated with bound
+        // parameters, so assert safety explicitly (also satisfies the 'static bound).
+        sqlx::query_with(
+            sqlx::AssertSqlSafe(self.sql_str.clone()),
+            self.value_to_arguments(&binds),
+        )
     }
 
     #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
@@ -63,7 +68,10 @@ impl ChainBuilder {
         T: for<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow>,
     {
         let (_, binds) = self.to_sql();
-        sqlx::query_as_with(self.sql_str.as_str(), self.value_to_arguments(&binds))
+        sqlx::query_as_with(
+            sqlx::AssertSqlSafe(self.sql_str.clone()),
+            self.value_to_arguments(&binds),
+        )
     }
 
     #[cfg(all(feature = "mysql", feature = "sqlx_mysql"))]
@@ -75,7 +83,7 @@ impl ChainBuilder {
         let (_, binds) = self.to_sql();
         let sql = self.sql_str.as_str();
         let sql = format!("SELECT COUNT({}) FROM ({}) as count", column, sql);
-        let qb = sqlx::query_with(&sql, self.value_to_arguments(&binds));
+        let qb = sqlx::query_with(sqlx::AssertSqlSafe(sql), self.value_to_arguments(&binds));
         let query_count = qb.fetch_one(pool).await?;
         let count: i64 = query_count.try_get(0)?;
         Ok(count)
