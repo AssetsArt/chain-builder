@@ -49,8 +49,17 @@ macro_rules! impl_into_bind_i64 {
 // Integers that always fit losslessly in i64.
 impl_into_bind_i64!(i8, i16, i32, i64, u8, u16, u32);
 
-// Wider/unsigned integers: narrowed via `as i64`. Values above `i64::MAX`
-// (or platform-wide `usize`/`isize`) wrap per Rust's `as` semantics.
+// Wider/unsigned integers: narrowed via `as i64`.
+//
+// Values above `i64::MAX` wrap per Rust's `as` truncation semantics rather
+// than erroring or saturating. For example `u64::MAX` becomes `-1`, and
+// `(i64::MAX as u64) + 1` becomes `i64::MIN`. This is intentional: the
+// canonical integer binding type is `i64`, and these conversions are provided
+// for ergonomics. Callers binding values above `i64::MAX` must account for the
+// wrap (or bind as `Value::Text` / a wider numeric type explicitly).
+//
+// (A `//` comment rather than `///` because rustdoc cannot attach a doc comment
+// to a macro invocation; the wrap is also asserted in the test module below.)
 impl_into_bind_i64!(u64, usize, isize);
 
 impl IntoBind for f32 {
@@ -139,6 +148,13 @@ mod tests {
         assert_eq!(7u64.into_bind(), Value::I64(7));
         assert_eq!(7usize.into_bind(), Value::I64(7));
         assert_eq!(7isize.into_bind(), Value::I64(7));
+    }
+
+    #[test]
+    fn u64_above_i64_max_wraps_intentionally() {
+        // Values above i64::MAX truncate via `as i64` (documented behaviour).
+        assert_eq!(((i64::MAX as u64) + 1).into_bind(), Value::I64(i64::MIN));
+        assert_eq!(u64::MAX.into_bind(), Value::I64(-1));
     }
 
     #[test]

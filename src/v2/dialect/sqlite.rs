@@ -3,7 +3,7 @@
 use super::Dialect;
 
 /// SQLite dialect marker.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Sqlite;
 
 impl Dialect for Sqlite {
