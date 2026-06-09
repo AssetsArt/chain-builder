@@ -11,6 +11,15 @@ use crate::v2::dialect::Dialect;
 use crate::v2::value::{IntoBind, Value};
 use crate::v2::where_::{Conj, Predicate, WhereBuilder};
 
+/// Sort direction for an `ORDER BY` column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Order {
+    /// Ascending (`ASC`).
+    Asc,
+    /// Descending (`DESC`).
+    Desc,
+}
+
 /// Which kind of statement is being built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Method {
@@ -32,6 +41,10 @@ pub struct QueryBuilder<D: Dialect> {
     pub(crate) wheres: Vec<Predicate>,
     pub(crate) method: Method,
     pub(crate) set: Vec<(String, Value)>,
+    pub(crate) groups: Vec<String>,
+    pub(crate) orders: Vec<(String, Order)>,
+    pub(crate) limit: Option<i64>,
+    pub(crate) offset: Option<i64>,
     _marker: PhantomData<D>,
 }
 
@@ -44,6 +57,10 @@ impl<D: Dialect> QueryBuilder<D> {
             wheres: Vec::new(),
             method: Method::Select,
             set: Vec::new(),
+            groups: Vec::new(),
+            orders: Vec::new(),
+            limit: None,
+            offset: None,
             _marker: PhantomData,
         }
     }
@@ -220,6 +237,51 @@ impl<D: Dialect> QueryBuilder<D> {
     /// Build a `DELETE`. WHERE still applies.
     pub fn delete(mut self) -> Self {
         self.method = Method::Delete;
+        self
+    }
+
+    /// Add `GROUP BY` columns (raw owned identifiers, escaped at compile time).
+    ///
+    /// SELECT-only: ignored for INSERT/UPDATE/DELETE.
+    pub fn group_by<I, S>(mut self, cols: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        self.groups
+            .extend(cols.into_iter().map(|c| c.as_ref().to_owned()));
+        self
+    }
+
+    /// Add an `ORDER BY col <ord>` term. SELECT-only.
+    pub fn order_by(mut self, col: &str, ord: Order) -> Self {
+        self.orders.push((col.to_owned(), ord));
+        self
+    }
+
+    /// Add an `ORDER BY col ASC` term. SELECT-only.
+    pub fn order_by_asc(self, col: &str) -> Self {
+        self.order_by(col, Order::Asc)
+    }
+
+    /// Add an `ORDER BY col DESC` term. SELECT-only.
+    pub fn order_by_desc(self, col: &str) -> Self {
+        self.order_by(col, Order::Desc)
+    }
+
+    /// Set `LIMIT n` (bound as a placeholder). SELECT-only.
+    pub fn limit(mut self, n: i64) -> Self {
+        self.limit = Some(n);
+        self
+    }
+
+    /// Set `OFFSET n` (bound as a placeholder). SELECT-only.
+    ///
+    /// `offset` requires `limit`: compiling an offset without a limit panics
+    /// (`offset(...) requires limit(...)`), uniform across dialects since MySQL
+    /// rejects a bare `OFFSET`.
+    pub fn offset(mut self, n: i64) -> Self {
+        self.offset = Some(n);
         self
     }
 
