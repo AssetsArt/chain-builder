@@ -94,12 +94,14 @@ pub enum Predicate<D: Dialect> {
     /// A parenthesized group of predicates.
     ///
     /// `outer_conj` controls how the group attaches to the preceding clause
-    /// (`AND (...)` vs `OR (...)`). The predicates *inside* the group are
-    /// ALWAYS joined by `AND` in M1 — see the [`WhereBuilder`] limitation note.
+    /// (`AND (...)` vs `OR (...)`). Inner predicates are joined with `AND`,
+    /// except that a nested `Group` carries its own `outer_conj` (so `or_where`
+    /// inside a group emits ` OR (...)`) — groups nest arbitrarily.
     Group {
         /// How this group attaches to the preceding clause (outer separator).
         outer_conj: Conj,
-        /// Inner predicates (always `AND`-joined in M1).
+        /// Inner predicates; rendered like the top level, so nested groups with
+        /// `outer_conj: Or` introduce `OR` within this group.
         preds: Vec<Predicate<D>>,
     },
     /// `lhs op rhs` — both sides are column identifiers (escaped at compile
@@ -137,13 +139,9 @@ pub enum Predicate<D: Dialect> {
 /// The `PhantomData<D>` keeps the dialect in scope without threading the full
 /// builder through the closure.
 ///
-/// # M1 limitation
-///
-/// Groups in M1 are **non-nestable** and **flat-`AND`**: every predicate added
-/// inside the closure is joined to its siblings with `AND`, and there is no way
-/// to nest a further group or to `OR` predicates *within* a group. The only
-/// `OR` available is the *outer* attachment chosen by `or_where` (which emits
-/// `... OR (...)`). Nested groups and inner-`OR` are a documented M1 limitation.
+/// Siblings added directly are `AND`-joined; call `and_where`/`or_where` inside
+/// the closure to nest a further parenthesized group (and `or_where` introduces
+/// `OR` within the group). Nesting is arbitrary-depth.
 pub struct WhereBuilder<D: Dialect> {
     preds: Vec<Predicate<D>>,
     _marker: PhantomData<D>,
@@ -167,6 +165,26 @@ impl<D: Dialect> WhereBuilder<D> {
     /// Consume the accumulator and return the collected predicates.
     pub(crate) fn into_preds(self) -> Vec<Predicate<D>> {
         self.preds
+    }
+
+    fn group(
+        mut self,
+        outer_conj: Conj,
+        f: impl FnOnce(WhereBuilder<D>) -> WhereBuilder<D>,
+    ) -> Self {
+        let preds = f(WhereBuilder::new()).into_preds();
+        self.preds.push(Predicate::Group { outer_conj, preds });
+        self
+    }
+
+    /// Add a nested parenthesized `AND (...)` group built by the closure.
+    pub fn and_where(self, f: impl FnOnce(WhereBuilder<D>) -> WhereBuilder<D>) -> Self {
+        self.group(Conj::And, f)
+    }
+
+    /// Add a nested parenthesized `OR (...)` group built by the closure.
+    pub fn or_where(self, f: impl FnOnce(WhereBuilder<D>) -> WhereBuilder<D>) -> Self {
+        self.group(Conj::Or, f)
     }
 
     fn binary(mut self, col: &str, op: &'static str, val: impl IntoBind) -> Self {
