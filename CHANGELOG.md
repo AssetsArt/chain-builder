@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- **`having()` now validates its operator against an allowlist** instead of
+  emitting it verbatim. The operator argument is `op: &str` (for ergonomics),
+  unlike `where_eq`/`where_column`/`JoinClause::on` which take `&'static str`
+  and so only accept compile-time literals. Because `having`'s operator is
+  written directly into the SQL (it is not a bound value), an
+  attacker-controlled operator — e.g. from a generic `{field, op, value}` filter
+  API — was a SQL-injection vector. The operator is now matched
+  case-insensitively against `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`, `LIKE`,
+  `NOT LIKE`; anything else **panics** (fail-loud, like the `offset`/
+  `distinct_on`/lock guards). Use `having_raw()` for arbitrary aggregate
+  expressions. Non-breaking: every existing call using a standard comparison
+  operator keeps working unchanged.
+
 ## [2.1.1] - 2026-06-09
 
 ### Changed
