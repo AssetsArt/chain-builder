@@ -2,7 +2,7 @@
 name = "chain-builder"
 version = "2.0.0"
 edition = "2021"
-description = "A typed, dialect-aware SQL query builder for Rust (PostgreSQL/MySQL/SQLite) — Knex-style."
+description = "A typed, dialect-aware SQL query builder for Rust (PostgreSQL/MySQL/SQLite)."
 license = "MIT"
 readme = "README.md"
 keywords = ["database", "sql", "query", "builder", "sqlx"]

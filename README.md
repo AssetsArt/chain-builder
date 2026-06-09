@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/crates/v/chain-builder?style=for-the-badge)](https://crates.io/crates/chain-builder)
 [![License](https://img.shields.io/crates/l/chain-builder?style=for-the-badge)](LICENSE)
 
-A **typed, dialect-aware SQL query builder** for Rust — "Knex for Rust".
+A **typed, dialect-aware SQL query builder** for Rust.
 
 Generic over a `Dialect` (**PostgreSQL / MySQL / SQLite**), with typed bind
 parameters, automatic identifier escaping, dialect-correct placeholders

@@ -2,7 +2,7 @@
 
 ## [2.0.0] - 2026-06-09
 
-### ⚠️ Breaking — complete rewrite ("Knex for Rust")
+### ⚠️ Breaking — complete rewrite
 
 v2 is now the crate root; the 1.x API is **removed**. The builder is a ground-up
 redesign — there is no in-place migration path; rewrite call sites against the new

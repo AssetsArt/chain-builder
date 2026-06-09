@@ -1,6 +1,6 @@
 //! # Chain Builder
 //!
-//! A typed, dialect-aware SQL query builder for Rust — "Knex for Rust".
+//! A typed, dialect-aware SQL query builder for Rust.
 //!
 //! Generic over a [`Dialect`] (PostgreSQL / MySQL / SQLite), with typed bind
 //! parameters via [`IntoBind`], dialect-correct placeholders (`$N` for Postgres,
