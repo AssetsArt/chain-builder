@@ -166,6 +166,9 @@ pub enum Method {
 /// Typed, dialect-aware SQL query builder.
 pub struct QueryBuilder<D: Dialect> {
     pub(crate) table: String,
+    /// Optional database/schema qualifier (multi-tenant: one connection, many DBs).
+    /// When set, prefixes the main table and join tables: `"db"."table"`.
+    pub(crate) db: Option<String>,
     pub(crate) select_cols: Vec<String>,
     pub(crate) wheres: Vec<Predicate>,
     pub(crate) method: Method,
@@ -186,6 +189,7 @@ impl<D: Dialect> QueryBuilder<D> {
     pub fn table(name: &str) -> Self {
         Self {
             table: name.to_owned(),
+            db: None,
             select_cols: Vec::new(),
             wheres: Vec::new(),
             method: Method::Select,
@@ -200,6 +204,16 @@ impl<D: Dialect> QueryBuilder<D> {
             unions: Vec::new(),
             _marker: PhantomData,
         }
+    }
+
+    /// Set the database/schema qualifier (multi-tenant: one connection, many DBs).
+    ///
+    /// The name prefixes the main table and every join table, escaped per dialect:
+    /// `QueryBuilder::<Postgres>::table("users").db("mydb")` →
+    /// `… FROM "mydb"."users"`. Matches 1.x `db()`.
+    pub fn db(mut self, name: &str) -> Self {
+        self.db = Some(name.to_owned());
+        self
     }
 
     /// Restrict the selected columns. An empty list selects `*`.
