@@ -201,10 +201,19 @@ pub struct QueryBuilder<D: Dialect> {
     pub(crate) wheres: Vec<Predicate>,
     pub(crate) method: Method,
     pub(crate) set: Vec<(String, Value)>,
+    /// Multi-row `INSERT` rows (empty unless `insert_many` was used). Each row is
+    /// a `(column, value)` list; columns come from the first row's sorted keys.
+    pub(crate) insert_rows: Vec<Vec<(String, Value)>>,
     pub(crate) joins: Vec<Join>,
     pub(crate) groups: Vec<String>,
+    /// Raw `GROUP BY` fragment (verbatim) with its own binds, appended after any
+    /// structured `groups`.
+    pub(crate) group_by_raw: Option<(String, Vec<Value>)>,
     pub(crate) havings: Vec<Having>,
     pub(crate) orders: Vec<(String, Order)>,
+    /// Raw `ORDER BY` fragment (verbatim) with its own binds, appended after any
+    /// structured `orders`.
+    pub(crate) order_by_raw: Option<(String, Vec<Value>)>,
     pub(crate) limit: Option<i64>,
     pub(crate) offset: Option<i64>,
     pub(crate) ctes: Vec<Cte<D>>,
@@ -228,10 +237,13 @@ impl<D: Dialect> QueryBuilder<D> {
             wheres: Vec::new(),
             method: Method::Select,
             set: Vec::new(),
+            insert_rows: Vec::new(),
             joins: Vec::new(),
             groups: Vec::new(),
+            group_by_raw: None,
             havings: Vec::new(),
             orders: Vec::new(),
+            order_by_raw: None,
             limit: None,
             offset: None,
             ctes: Vec::new(),
@@ -454,6 +466,33 @@ impl<D: Dialect> QueryBuilder<D> {
         self
     }
 
+    /// Build a multi-row `INSERT` from an iterator of rows, each a sequence of
+    /// `(column, value)` pairs.
+    ///
+    /// The inserted column set is taken from the **first** row's keys (sorted, as
+    /// with [`Self::insert`]). For each subsequent row, a value is bound for every
+    /// column in that set; a key **missing** in a later row binds `Value::Null`
+    /// rather than panicking (DoS-safe, matching the 1.x hardening). Composes with
+    /// `on_conflict_*` and `returning`.
+    pub fn insert_many<K, V, R, Rows>(mut self, rows: Rows) -> Self
+    where
+        K: AsRef<str>,
+        V: IntoBind,
+        R: IntoIterator<Item = (K, V)>,
+        Rows: IntoIterator<Item = R>,
+    {
+        self.method = Method::Insert;
+        self.insert_rows = rows
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|(k, v)| (k.as_ref().to_owned(), v.into_bind()))
+                    .collect()
+            })
+            .collect();
+        self
+    }
+
     /// Build an `UPDATE` from `(column, value)` pairs. WHERE still applies.
     pub fn update<K, V, I>(mut self, set: I) -> Self
     where
@@ -547,6 +586,46 @@ impl<D: Dialect> QueryBuilder<D> {
     {
         self.groups
             .extend(cols.into_iter().map(|c| c.as_ref().to_owned()));
+        self
+    }
+
+    /// Add a raw `GROUP BY` fragment with its own binds — the verbatim escape
+    /// hatch. SELECT-only.
+    ///
+    /// The fragment is appended after any structured [`Self::group_by`] columns
+    /// within the same `GROUP BY` clause (e.g. `GROUP BY "a", <raw>`); if no
+    /// structured columns are present it becomes the whole `GROUP BY <raw>`.
+    ///
+    /// # Warning: positional placeholder contract
+    ///
+    /// `sql` is emitted **verbatim** (it is NOT escaped or renumbered) and
+    /// `binds` are appended to the running bind list in order. For
+    /// **Postgres**, the caller MUST write `$N` numbers matching the actual
+    /// bind position — that is, `number of binds already accumulated + 1`, `+2`,
+    /// … For MySQL/SQLite use `?`. No renumbering is performed, so a wrong `$N`
+    /// produces a malformed query.
+    pub fn group_by_raw(mut self, sql: &str, binds: Vec<Value>) -> Self {
+        self.group_by_raw = Some((sql.to_owned(), binds));
+        self
+    }
+
+    /// Add a raw `ORDER BY` fragment with its own binds — the verbatim escape
+    /// hatch. SELECT-only.
+    ///
+    /// The fragment is appended after any structured [`Self::order_by`] terms
+    /// within the same `ORDER BY` clause (e.g. `ORDER BY "a" ASC, <raw>`); if no
+    /// structured terms are present it becomes the whole `ORDER BY <raw>`.
+    ///
+    /// # Warning: positional placeholder contract
+    ///
+    /// `sql` is emitted **verbatim** (it is NOT escaped or renumbered) and
+    /// `binds` are appended to the running bind list in order. For
+    /// **Postgres**, the caller MUST write `$N` numbers matching the actual
+    /// bind position — that is, `number of binds already accumulated + 1`, `+2`,
+    /// … For MySQL/SQLite use `?`. No renumbering is performed, so a wrong `$N`
+    /// produces a malformed query.
+    pub fn order_by_raw(mut self, sql: &str, binds: Vec<Value>) -> Self {
+        self.order_by_raw = Some((sql.to_owned(), binds));
         self
     }
 

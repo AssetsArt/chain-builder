@@ -97,18 +97,30 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             ctx.sql.push_str(&table);
             write_joins::<D>(ctx, &qb.joins, qb.db.as_deref());
             write_wheres::<D>(ctx, &qb.wheres);
-            write_group_by(ctx, &qb.groups);
+            write_group_by(ctx, &qb.groups, qb.group_by_raw.as_ref());
             write_having::<D>(ctx, &qb.havings);
-            write_order_by(ctx, &qb.orders);
+            write_order_by(ctx, &qb.orders, qb.order_by_raw.as_ref());
             write_limit_offset::<D>(ctx, qb.limit, qb.offset);
             write_unions::<D>(ctx, &qb.unions);
         }
         Method::Insert => {
-            if qb.set.is_empty() {
+            if qb.set.is_empty() && qb.insert_rows.is_empty() {
                 panic!("insert() requires at least one column");
             }
-            let mut rows: Vec<&(String, Value)> = qb.set.iter().collect();
-            rows.sort_by(|a, b| a.0.cmp(&b.0));
+
+            // Single-row sorted pairs (preserves the M-prev path byte-for-byte,
+            // including duplicate keys). For multi-row, columns come from the
+            // FIRST row's sorted keys.
+            let mut single_rows: Vec<&(String, Value)> = qb.set.iter().collect();
+            single_rows.sort_by(|a, b| a.0.cmp(&b.0));
+            let sorted_cols: Vec<&str> = if !qb.insert_rows.is_empty() {
+                let mut cols: Vec<&str> =
+                    qb.insert_rows[0].iter().map(|(k, _)| k.as_str()).collect();
+                cols.sort_unstable();
+                cols
+            } else {
+                single_rows.iter().map(|(k, _)| k.as_str()).collect()
+            };
 
             // Decide the INSERT keyword up front: MySQL `DO NOTHING` becomes
             // `INSERT IGNORE INTO …` with no trailing conflict clause.
@@ -124,21 +136,47 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             }
             ctx.sql.push_str(&table);
             ctx.sql.push_str(" (");
-            let cols: Vec<String> = rows.iter().map(|(k, _)| ctx.esc(k)).collect();
+            let cols: Vec<String> = sorted_cols.iter().map(|k| ctx.esc(k)).collect();
             ctx.sql.push_str(&cols.join(", "));
-            ctx.sql.push_str(") VALUES (");
-            for (i, (_, v)) in rows.iter().enumerate() {
-                if i > 0 {
-                    ctx.sql.push_str(", ");
+            ctx.sql.push_str(") VALUES ");
+
+            if !qb.insert_rows.is_empty() {
+                // Multi-row: one `(…)` tuple per row. A key missing in a row binds
+                // `Value::Null` (ragged rows are NULL-padded, never a panic).
+                for (ri, row) in qb.insert_rows.iter().enumerate() {
+                    if ri > 0 {
+                        ctx.sql.push_str(", ");
+                    }
+                    ctx.sql.push('(');
+                    for (ci, col) in sorted_cols.iter().enumerate() {
+                        if ci > 0 {
+                            ctx.sql.push_str(", ");
+                        }
+                        let v = row
+                            .iter()
+                            .find(|(k, _)| k == col)
+                            .map(|(_, v)| v.clone())
+                            .unwrap_or(Value::Null);
+                        ctx.placeholder::<D>(v);
+                    }
+                    ctx.sql.push(')');
                 }
-                ctx.placeholder::<D>(v.clone());
+            } else {
+                // Single-row: byte-identical to the M-prev path (iterate the
+                // sorted (key, value) pairs directly, duplicates and all).
+                ctx.sql.push('(');
+                for (i, (_, v)) in single_rows.iter().enumerate() {
+                    if i > 0 {
+                        ctx.sql.push_str(", ");
+                    }
+                    ctx.placeholder::<D>(v.clone());
+                }
+                ctx.sql.push(')');
             }
-            ctx.sql.push(')');
 
             if !mysql_ignore {
                 if let Some(oc) = &qb.on_conflict {
-                    let inserted: Vec<&str> = rows.iter().map(|(k, _)| k.as_str()).collect();
-                    write_on_conflict::<D>(ctx, oc, &inserted);
+                    write_on_conflict::<D>(ctx, oc, &sorted_cols);
                 }
             }
             write_returning::<D>(ctx, &qb.returning);
@@ -246,14 +284,24 @@ fn write_returning<D: Dialect>(ctx: &mut Ctx, cols: &[String]) {
     ctx.sql.push_str(&parts.join(", "));
 }
 
-/// Render `GROUP BY a, b, …` (SELECT only). No-op when there are no columns.
-fn write_group_by(ctx: &mut Ctx, groups: &[String]) {
-    if groups.is_empty() {
+/// Render `GROUP BY a, b, …` (SELECT only). No-op when there are no columns and
+/// no raw fragment. A raw fragment is appended (comma-joined) after the
+/// structured columns; if only raw is present it becomes the whole clause.
+fn write_group_by(ctx: &mut Ctx, groups: &[String], raw: Option<&(String, Vec<Value>)>) {
+    if groups.is_empty() && raw.is_none() {
         return;
     }
     ctx.sql.push_str(" GROUP BY ");
     let cols: Vec<String> = groups.iter().map(|c| ctx.esc(c)).collect();
     ctx.sql.push_str(&cols.join(", "));
+    if let Some((sql, binds)) = raw {
+        if !groups.is_empty() {
+            ctx.sql.push_str(", ");
+        }
+        // Verbatim escape hatch (see `group_by_raw` docs).
+        ctx.sql.push_str(sql);
+        ctx.binds.extend(binds.iter().cloned());
+    }
 }
 
 /// Render each `JOIN` (SELECT only): ` {KIND} {esc table}[ ON cond AND …]`.
@@ -369,9 +417,11 @@ fn write_unions<D: Dialect>(ctx: &mut Ctx, unions: &[(bool, QueryBuilder<D>)]) {
     }
 }
 
-/// Render `ORDER BY a ASC, b DESC, …` (SELECT only). No-op when empty.
-fn write_order_by(ctx: &mut Ctx, orders: &[(String, Order)]) {
-    if orders.is_empty() {
+/// Render `ORDER BY a ASC, b DESC, …` (SELECT only). No-op when empty and no raw
+/// fragment. A raw fragment is appended (comma-joined) after the structured
+/// terms; if only raw is present it becomes the whole clause.
+fn write_order_by(ctx: &mut Ctx, orders: &[(String, Order)], raw: Option<&(String, Vec<Value>)>) {
+    if orders.is_empty() && raw.is_none() {
         return;
     }
     ctx.sql.push_str(" ORDER BY ");
@@ -386,6 +436,14 @@ fn write_order_by(ctx: &mut Ctx, orders: &[(String, Order)]) {
         })
         .collect();
     ctx.sql.push_str(&cols.join(", "));
+    if let Some((sql, binds)) = raw {
+        if !orders.is_empty() {
+            ctx.sql.push_str(", ");
+        }
+        // Verbatim escape hatch (see `order_by_raw` docs).
+        ctx.sql.push_str(sql);
+        ctx.binds.extend(binds.iter().cloned());
+    }
 }
 
 /// Render `LIMIT $n [OFFSET $m]` (SELECT only), binding both values.
