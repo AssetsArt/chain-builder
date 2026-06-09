@@ -18,4 +18,8 @@ impl Dialect for Sqlite {
     fn supports_returning() -> bool {
         true
     }
+
+    fn supports_row_locking() -> bool {
+        false
+    }
 }

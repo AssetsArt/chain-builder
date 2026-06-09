@@ -34,9 +34,12 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 ## Typed binds (`IntoBind` / `Value`)
 
 Bind arguments accept any `IntoBind`: integers, `f32`/`f64`, `bool`, `&str`/
-`String`, `Vec<u8>`/`&[u8]`, `Option<T>` (`None` → SQL `NULL`), and (with the
-`json` feature) `serde_json::Value`. They are stored in an internal `Value` enum
-and bound to `sqlx` with the right type — never inlined into SQL.
+`String`, `Vec<u8>`/`&[u8]`, `Option<T>` (`None` → SQL `NULL`), and the
+feature-gated types `serde_json::Value` (`json`), `uuid::Uuid` (`uuid`), the
+`chrono` date/time types (`chrono`), and `rust_decimal::Decimal` (`decimal`).
+They are stored in an internal `Value` enum and bound to `sqlx` with the right
+type — never inlined into SQL. `Decimal` binds natively on Postgres/MySQL and as
+TEXT on SQLite (which has no native decimal type).
 
 ## WHERE
 
@@ -58,8 +61,41 @@ Empty `IN ()` → `1 = 0`; empty `NOT IN ()` → `1 = 1`.
 ## SELECT / DISTINCT / aggregates
 
 `select([cols])` (bare identifiers, dotted ok), `select_raw(expr, binds)` for
-expressions (`COUNT(*)`, `... AS alias`), `distinct()`, `distinct_on([cols])`
-(Postgres only — panics elsewhere).
+arbitrary expressions, `distinct()`, `distinct_on([cols])` (Postgres only —
+panics elsewhere).
+
+Structured aggregate helpers escape the column at compile time (`*` passed
+through) and accept an optional alias via the `_as` variants:
+
+```rust
+QueryBuilder::<Postgres>::table("orders")
+    .select(["status"])
+    .select_count_as("*", "cnt")        // COUNT(*) AS "cnt"
+    .select_sum_as("amount", "total")   // SUM("amount") AS "total"
+    .group_by(["status"]);
+// SELECT "status", COUNT(*) AS "cnt", SUM("amount") AS "total" FROM "orders" GROUP BY "status"
+```
+
+`select_count`/`select_sum`/`select_avg`/`select_min`/`select_max` (no alias),
+their `_as` variants, and `select_as(col, alias)` for plain column aliasing.
+
+## Row locking
+
+`for_update()` / `for_share()` append a locking clause to a `SELECT`;
+`skip_locked()` / `no_wait()` add the corresponding modifier (and default the
+strength to `FOR UPDATE` if called alone). Honored by Postgres / MySQL; a
+**silent no-op on SQLite** (which locks the whole database, not rows) — ideal for
+job-queue / multi-tenant claim patterns:
+
+```rust
+QueryBuilder::<Postgres>::table("jobs")
+    .select(["id"])
+    .where_eq("status", "queued")
+    .limit(1)
+    .for_update()
+    .skip_locked();
+// SELECT "id" FROM "jobs" WHERE "status" = $1 LIMIT $2 FOR UPDATE SKIP LOCKED
+```
 
 ## JOIN / CTE / UNION
 
@@ -138,8 +174,9 @@ through raw methods.
 
 ## Known limitations
 
-- Live-DB integration tests require an `sqlx` runtime (the bundled tests are
-  compile-/string-level).
-- No `uuid` / `chrono` / `rust_decimal` `Value` variants yet (the enum is
-  `#[non_exhaustive]`); JSON path operators and named-constraint upsert targets
-  are not yet implemented.
+- Most bundled tests are string-level; a live `sqlite::memory:` round-trip test
+  exercises the real `sqlx` handoff.
+- JSON path operators, named-constraint upsert targets, derived tables
+  (subquery in `FROM`), and `INSERT … SELECT` are not yet implemented. The
+  `Value` enum is `#[non_exhaustive]`, so further variants can be added without a
+  breaking change.

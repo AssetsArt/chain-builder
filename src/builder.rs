@@ -174,6 +174,90 @@ pub struct OnConflict {
     pub action: ConflictAction,
 }
 
+/// A SQL aggregate function for the `select_*` aggregate helpers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AggFn {
+    /// `COUNT(...)`.
+    Count,
+    /// `SUM(...)`.
+    Sum,
+    /// `AVG(...)`.
+    Avg,
+    /// `MIN(...)`.
+    Min,
+    /// `MAX(...)`.
+    Max,
+}
+
+impl AggFn {
+    /// The uppercase SQL keyword for this function.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AggFn::Count => "COUNT",
+            AggFn::Sum => "SUM",
+            AggFn::Avg => "AVG",
+            AggFn::Min => "MIN",
+            AggFn::Max => "MAX",
+        }
+    }
+}
+
+/// A structured `SELECT`-list expression (aggregate or aliased column).
+///
+/// The `col`/`alias` identifiers are stored raw and escaped at compile time
+/// (a `*` column is emitted unescaped, e.g. `COUNT(*)`). Backs the `select_count`
+/// / `select_sum` / … and `select_as` helpers.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SelectExpr {
+    /// `FUNC(col)` with an optional `AS alias` — e.g. `COUNT(*) AS "total"`.
+    Agg {
+        /// The aggregate function.
+        func: AggFn,
+        /// Raw column identifier (escaped at compile time; `*` passed through).
+        col: String,
+        /// Optional alias (escaped at compile time).
+        alias: Option<String>,
+    },
+    /// `col AS alias` — both identifiers escaped at compile time.
+    ColAs {
+        /// Raw column identifier (escaped at compile time).
+        col: String,
+        /// Alias (escaped at compile time).
+        alias: String,
+    },
+}
+
+/// The strength of a row-locking clause.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LockStrength {
+    /// `FOR UPDATE` — exclusive lock.
+    Update,
+    /// `FOR SHARE` — shared lock.
+    Share,
+}
+
+/// The optional wait behavior of a row-locking clause.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LockWait {
+    /// `SKIP LOCKED` — skip rows already locked.
+    SkipLocked,
+    /// `NOWAIT` — error immediately if a row is already locked.
+    NoWait,
+}
+
+/// A row-locking clause appended to a `SELECT` (`FOR UPDATE` / `FOR SHARE`,
+/// optionally `SKIP LOCKED` / `NOWAIT`).
+///
+/// Honored by Postgres / MySQL; a **silent no-op on SQLite** (see
+/// [`Dialect::supports_row_locking`](crate::Dialect::supports_row_locking)).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Lock {
+    /// `FOR UPDATE` vs `FOR SHARE`.
+    pub strength: LockStrength,
+    /// Optional `SKIP LOCKED` / `NOWAIT` modifier.
+    pub wait: Option<LockWait>,
+}
+
 /// Which kind of statement is being built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Method {
@@ -196,6 +280,10 @@ pub struct QueryBuilder<D: Dialect> {
     /// When set, prefixes the main table and join tables: `"db"."table"`.
     pub(crate) db: Option<String>,
     pub(crate) select_cols: Vec<String>,
+    /// Structured `SELECT` expressions (aggregates / aliased columns), escaped at
+    /// compile time. Rendered after `select_cols`. Backs `select_count`/… /
+    /// `select_as`.
+    pub(crate) select_exprs: Vec<SelectExpr>,
     /// Raw `SELECT` expressions (verbatim, NOT escaped) with their own binds,
     /// appended after `select_cols`. Backs `select_raw`.
     pub(crate) select_raw: Vec<(String, Vec<Value>)>,
@@ -230,6 +318,8 @@ pub struct QueryBuilder<D: Dialect> {
     pub(crate) on_conflict: Option<OnConflict>,
     /// `RETURNING` column list (raw; `"*"` emitted unescaped).
     pub(crate) returning: Vec<String>,
+    /// Row-locking clause (`FOR UPDATE`/`FOR SHARE`); SELECT-only, no-op on SQLite.
+    pub(crate) lock: Option<Lock>,
     _marker: PhantomData<D>,
 }
 
@@ -240,6 +330,7 @@ impl<D: Dialect> QueryBuilder<D> {
             table: name.to_owned(),
             db: None,
             select_cols: Vec::new(),
+            select_exprs: Vec::new(),
             select_raw: Vec::new(),
             select_subqueries: Vec::new(),
             distinct: false,
@@ -260,6 +351,7 @@ impl<D: Dialect> QueryBuilder<D> {
             unions: Vec::new(),
             on_conflict: None,
             returning: Vec::new(),
+            lock: None,
             _marker: PhantomData,
         }
     }
@@ -311,6 +403,74 @@ impl<D: Dialect> QueryBuilder<D> {
     pub fn select_subquery(mut self, alias: &str, sub: QueryBuilder<D>) -> Self {
         self.select_subqueries
             .push((alias.to_owned(), Box::new(sub)));
+        self
+    }
+
+    fn push_agg(mut self, func: AggFn, col: &str, alias: Option<&str>) -> Self {
+        self.select_exprs.push(SelectExpr::Agg {
+            func,
+            col: col.to_owned(),
+            alias: alias.map(|a| a.to_owned()),
+        });
+        self
+    }
+
+    /// Add `COUNT(col)` to the SELECT list (`col == "*"` → `COUNT(*)`).
+    pub fn select_count(self, col: &str) -> Self {
+        self.push_agg(AggFn::Count, col, None)
+    }
+
+    /// Add `COUNT(col) AS alias` (both identifiers escaped; `*` passed through).
+    pub fn select_count_as(self, col: &str, alias: &str) -> Self {
+        self.push_agg(AggFn::Count, col, Some(alias))
+    }
+
+    /// Add `SUM(col)` to the SELECT list.
+    pub fn select_sum(self, col: &str) -> Self {
+        self.push_agg(AggFn::Sum, col, None)
+    }
+
+    /// Add `SUM(col) AS alias`.
+    pub fn select_sum_as(self, col: &str, alias: &str) -> Self {
+        self.push_agg(AggFn::Sum, col, Some(alias))
+    }
+
+    /// Add `AVG(col)` to the SELECT list.
+    pub fn select_avg(self, col: &str) -> Self {
+        self.push_agg(AggFn::Avg, col, None)
+    }
+
+    /// Add `AVG(col) AS alias`.
+    pub fn select_avg_as(self, col: &str, alias: &str) -> Self {
+        self.push_agg(AggFn::Avg, col, Some(alias))
+    }
+
+    /// Add `MIN(col)` to the SELECT list.
+    pub fn select_min(self, col: &str) -> Self {
+        self.push_agg(AggFn::Min, col, None)
+    }
+
+    /// Add `MIN(col) AS alias`.
+    pub fn select_min_as(self, col: &str, alias: &str) -> Self {
+        self.push_agg(AggFn::Min, col, Some(alias))
+    }
+
+    /// Add `MAX(col)` to the SELECT list.
+    pub fn select_max(self, col: &str) -> Self {
+        self.push_agg(AggFn::Max, col, None)
+    }
+
+    /// Add `MAX(col) AS alias`.
+    pub fn select_max_as(self, col: &str, alias: &str) -> Self {
+        self.push_agg(AggFn::Max, col, Some(alias))
+    }
+
+    /// Add `col AS alias` to the SELECT list (both identifiers escaped).
+    pub fn select_as(mut self, col: &str, alias: &str) -> Self {
+        self.select_exprs.push(SelectExpr::ColAs {
+            col: col.to_owned(),
+            alias: alias.to_owned(),
+        });
         self
     }
 
@@ -750,6 +910,64 @@ impl<D: Dialect> QueryBuilder<D> {
     /// rejects a bare `OFFSET`.
     pub fn offset(mut self, n: i64) -> Self {
         self.offset = Some(n);
+        self
+    }
+
+    /// Lock selected rows with `FOR UPDATE`. SELECT-only.
+    ///
+    /// Honored by Postgres / MySQL; a **silent no-op on SQLite**. Preserves any
+    /// `SKIP LOCKED` / `NOWAIT` modifier already set.
+    pub fn for_update(mut self) -> Self {
+        let wait = self.lock.and_then(|l| l.wait);
+        self.lock = Some(Lock {
+            strength: LockStrength::Update,
+            wait,
+        });
+        self
+    }
+
+    /// Lock selected rows with `FOR SHARE`. SELECT-only.
+    ///
+    /// Honored by Postgres / MySQL; a **silent no-op on SQLite**. Preserves any
+    /// `SKIP LOCKED` / `NOWAIT` modifier already set.
+    pub fn for_share(mut self) -> Self {
+        let wait = self.lock.and_then(|l| l.wait);
+        self.lock = Some(Lock {
+            strength: LockStrength::Share,
+            wait,
+        });
+        self
+    }
+
+    /// Add `SKIP LOCKED` to the row-locking clause (skip already-locked rows).
+    ///
+    /// If no lock strength was set yet, defaults to `FOR UPDATE`. SELECT-only;
+    /// no-op on SQLite.
+    pub fn skip_locked(mut self) -> Self {
+        let strength = self
+            .lock
+            .map(|l| l.strength)
+            .unwrap_or(LockStrength::Update);
+        self.lock = Some(Lock {
+            strength,
+            wait: Some(LockWait::SkipLocked),
+        });
+        self
+    }
+
+    /// Add `NOWAIT` to the row-locking clause (error if a row is already locked).
+    ///
+    /// If no lock strength was set yet, defaults to `FOR UPDATE`. SELECT-only;
+    /// no-op on SQLite.
+    pub fn no_wait(mut self) -> Self {
+        let strength = self
+            .lock
+            .map(|l| l.strength)
+            .unwrap_or(LockStrength::Update);
+        self.lock = Some(Lock {
+            strength,
+            wait: Some(LockWait::NoWait),
+        });
         self
     }
 

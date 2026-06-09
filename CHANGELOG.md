@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.1.0] - 2026-06-09
+
+### Added
+
+- **Row locking** — `for_update()` / `for_share()` plus `skip_locked()` /
+  `no_wait()` modifiers, rendered at the end of a `SELECT`. Honored by
+  Postgres / MySQL; a silent no-op on SQLite (which locks the whole database,
+  not rows). New `Dialect::supports_row_locking()` capability (default `true`,
+  SQLite overrides to `false`). Public types: `Lock`, `LockStrength`, `LockWait`.
+- **Aggregate SELECT helpers** — `select_count`/`select_sum`/`select_avg`/
+  `select_min`/`select_max` (+ `_as` aliased variants) and `select_as(col, alias)`
+  for plain column aliasing. Columns are escaped at compile time; `*` is passed
+  through (`COUNT(*)`). Restores the 1.x aggregate ergonomics. Public types:
+  `AggFn`, `SelectExpr`.
+- **`Value::Decimal` (`decimal` feature)** — bind `rust_decimal::Decimal` for
+  money / exact-numeric columns. Bound natively on Postgres (`NUMERIC`) and
+  MySQL (`DECIMAL`); bound as TEXT on SQLite (no native decimal type).
+
+### Notes
+
+- All additions are backwards compatible; existing generated SQL is unchanged
+  when the new builders are not used.
+
 ## [2.0.0] - 2026-06-09
 
 ### ⚠️ Breaking — complete rewrite

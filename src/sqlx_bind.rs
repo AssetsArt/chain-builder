@@ -106,6 +106,11 @@ impl SqlxDialect for Postgres {
                 Value::NaiveTime(t) => {
                     let _ = arguments.add(*t);
                 }
+                #[cfg(feature = "decimal")]
+                Value::Decimal(d) => {
+                    // Native NUMERIC on Postgres.
+                    let _ = arguments.add(*d);
+                }
             }
         }
         arguments
@@ -164,6 +169,11 @@ impl SqlxDialect for MySql {
                 #[cfg(feature = "chrono")]
                 Value::NaiveTime(t) => {
                     let _ = arguments.add(*t);
+                }
+                #[cfg(feature = "decimal")]
+                Value::Decimal(d) => {
+                    // Native DECIMAL on MySQL.
+                    let _ = arguments.add(*d);
                 }
             }
         }
@@ -225,6 +235,12 @@ impl SqlxDialect for Sqlite {
                 #[cfg(feature = "chrono")]
                 Value::NaiveTime(t) => {
                     let _ = arguments.add(*t);
+                }
+                #[cfg(feature = "decimal")]
+                Value::Decimal(d) => {
+                    // SQLite has no native decimal type and sqlx provides no
+                    // `Decimal` encoder for it, so bind the exact value as TEXT.
+                    let _ = arguments.add(d.to_string());
                 }
             }
         }

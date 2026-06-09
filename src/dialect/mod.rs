@@ -58,6 +58,14 @@ pub trait Dialect: Sized + Send + Sync + 'static {
     fn ilike_is_native() -> bool {
         false
     }
+
+    /// Whether this dialect supports row-locking clauses (`FOR UPDATE` /
+    /// `FOR SHARE`, optionally `SKIP LOCKED` / `NOWAIT`). Defaults to `true`
+    /// (Postgres / MySQL); SQLite overrides to `false`, where such clauses are a
+    /// silent no-op (SQLite locks the whole database, not rows).
+    fn supports_row_locking() -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

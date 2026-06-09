@@ -48,8 +48,8 @@ pub mod fetch;
 pub mod sqlx_bind;
 
 pub use builder::{
-    ConflictAction, Cte, Having, Join, JoinClause, JoinCond, JoinKind, Method, OnConflict, Order,
-    QueryBuilder,
+    AggFn, ConflictAction, Cte, Having, Join, JoinClause, JoinCond, JoinKind, Lock, LockStrength,
+    LockWait, Method, OnConflict, Order, QueryBuilder, SelectExpr,
 };
 pub use compile::compile;
 pub use dialect::{Dialect, MySql, Postgres, Sqlite, UpsertStyle};
