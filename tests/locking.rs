@@ -100,3 +100,59 @@ fn for_share_then_skip_locked_preserves_strength() {
         .to_sql();
     assert_eq!(sql, r#"SELECT "id" FROM "jobs" FOR SHARE SKIP LOCKED"#);
 }
+
+#[test]
+#[should_panic(expected = "only valid on SELECT")]
+fn lock_on_delete_panics() {
+    // A lock on a non-SELECT is a dangerous silent no-op — fail loud instead.
+    let _ = QueryBuilder::<Postgres>::table("jobs")
+        .delete()
+        .for_update()
+        .to_sql();
+}
+
+#[test]
+#[should_panic(expected = "only valid on SELECT")]
+fn lock_on_update_panics() {
+    let _ = QueryBuilder::<Postgres>::table("jobs")
+        .update([("status", "done")])
+        .for_update()
+        .to_sql();
+}
+
+#[test]
+#[should_panic(expected = "only valid on SELECT")]
+fn lock_on_non_select_panics_on_sqlite_too() {
+    // Dialect-independent: the misuse is structural, not a dialect capability.
+    let _ = QueryBuilder::<Sqlite>::table("jobs")
+        .delete()
+        .for_update()
+        .to_sql();
+}
+
+#[test]
+#[should_panic(expected = "cannot be combined with UNION")]
+fn lock_with_union_panics() {
+    // Postgres/MySQL reject FOR UPDATE on a UNION result — fail loud.
+    let arm = QueryBuilder::<Postgres>::table("archived_jobs").select(["id"]);
+    let _ = QueryBuilder::<Postgres>::table("jobs")
+        .select(["id"])
+        .for_update()
+        .union(arm)
+        .to_sql();
+}
+
+#[test]
+fn lock_with_union_is_noop_on_sqlite() {
+    // SQLite drops the lock entirely, so lock+UNION stays a harmless no-op there.
+    let arm = QueryBuilder::<Sqlite>::table("archived_jobs").select(["id"]);
+    let (sql, _) = QueryBuilder::<Sqlite>::table("jobs")
+        .select(["id"])
+        .for_update()
+        .union(arm)
+        .to_sql();
+    assert_eq!(
+        sql,
+        r#"SELECT "id" FROM "jobs" UNION SELECT "id" FROM "archived_jobs""#
+    );
+}

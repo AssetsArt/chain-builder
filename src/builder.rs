@@ -250,6 +250,9 @@ pub enum LockWait {
 ///
 /// Honored by Postgres / MySQL; a **silent no-op on SQLite** (see
 /// [`Dialect::supports_row_locking`](crate::Dialect::supports_row_locking)).
+/// Compiling panics if a lock is attached to a non-`SELECT` statement (a
+/// dangerous silent no-op otherwise) or combined with `UNION` on a locking
+/// dialect (invalid SQL).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Lock {
     /// `FOR UPDATE` vs `FOR SHARE`.
@@ -913,10 +916,11 @@ impl<D: Dialect> QueryBuilder<D> {
         self
     }
 
-    /// Lock selected rows with `FOR UPDATE`. SELECT-only.
+    /// Lock selected rows with `FOR UPDATE`.
     ///
     /// Honored by Postgres / MySQL; a **silent no-op on SQLite**. Preserves any
-    /// `SKIP LOCKED` / `NOWAIT` modifier already set.
+    /// `SKIP LOCKED` / `NOWAIT` modifier already set. **SELECT-only:** compiling
+    /// panics if attached to INSERT/UPDATE/DELETE or combined with `UNION`.
     pub fn for_update(mut self) -> Self {
         let wait = self.lock.and_then(|l| l.wait);
         self.lock = Some(Lock {
@@ -926,10 +930,11 @@ impl<D: Dialect> QueryBuilder<D> {
         self
     }
 
-    /// Lock selected rows with `FOR SHARE`. SELECT-only.
+    /// Lock selected rows with `FOR SHARE`.
     ///
     /// Honored by Postgres / MySQL; a **silent no-op on SQLite**. Preserves any
-    /// `SKIP LOCKED` / `NOWAIT` modifier already set.
+    /// `SKIP LOCKED` / `NOWAIT` modifier already set. **SELECT-only:** compiling
+    /// panics if attached to INSERT/UPDATE/DELETE or combined with `UNION`.
     pub fn for_share(mut self) -> Self {
         let wait = self.lock.and_then(|l| l.wait);
         self.lock = Some(Lock {
