@@ -87,12 +87,7 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             } else {
                 ctx.sql.push_str("SELECT ");
             }
-            if qb.select_cols.is_empty() {
-                ctx.sql.push('*');
-            } else {
-                let cols: Vec<String> = qb.select_cols.iter().map(|c| ctx.esc(c)).collect();
-                ctx.sql.push_str(&cols.join(", "));
-            }
+            write_select_list::<D>(ctx, qb);
             ctx.sql.push_str(" FROM ");
             ctx.sql.push_str(&table);
             write_joins::<D>(ctx, &qb.joins, qb.db.as_deref());
@@ -304,6 +299,48 @@ fn write_group_by(ctx: &mut Ctx, groups: &[String], raw: Option<&(String, Vec<Va
     }
 }
 
+/// Render the SELECT column list: escaped `select_cols`, then verbatim
+/// `select_raw` expressions, then `(<subquery>) AS {alias}` columns — in that
+/// order. An empty list (no cols, no raw, no subqueries) yields `*`.
+///
+/// Written directly into `ctx` (not pre-joined) so subquery binds continue the
+/// placeholder counter in emission order.
+fn write_select_list<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
+    if qb.select_cols.is_empty() && qb.select_raw.is_empty() && qb.select_subqueries.is_empty() {
+        ctx.sql.push('*');
+        return;
+    }
+    let mut wrote_any = false;
+    for c in &qb.select_cols {
+        if wrote_any {
+            ctx.sql.push_str(", ");
+        }
+        let e = ctx.esc(c);
+        ctx.sql.push_str(&e);
+        wrote_any = true;
+    }
+    for (sql, binds) in &qb.select_raw {
+        if wrote_any {
+            ctx.sql.push_str(", ");
+        }
+        // Verbatim escape hatch (see `select_raw` docs).
+        ctx.sql.push_str(sql);
+        ctx.binds.extend(binds.iter().cloned());
+        wrote_any = true;
+    }
+    for (alias, sub) in &qb.select_subqueries {
+        if wrote_any {
+            ctx.sql.push_str(", ");
+        }
+        ctx.sql.push('(');
+        compile_into::<D>(ctx, sub);
+        ctx.sql.push_str(") AS ");
+        let a = ctx.esc(alias);
+        ctx.sql.push_str(&a);
+        wrote_any = true;
+    }
+}
+
 /// Render each `JOIN` (SELECT only): ` {KIND} {esc table}[ ON cond AND …]`.
 /// `CROSS JOIN` emits no `ON`. Placeholders from `OnVal`/`OnRaw` continue the
 /// running counter.
@@ -467,11 +504,11 @@ fn write_limit_offset<D: Dialect>(ctx: &mut Ctx, limit: Option<i64>, offset: Opt
 /// A predicate produces no SQL if it is an empty group (F4): an empty group
 /// would emit invalid `()`, so it is skipped entirely (and must not leave a
 /// dangling `AND`/`OR` separator behind it).
-fn is_omitted(p: &Predicate) -> bool {
+fn is_omitted<D: Dialect>(p: &Predicate<D>) -> bool {
     matches!(p, Predicate::Group { preds, .. } if preds.is_empty())
 }
 
-fn write_wheres<D: Dialect>(ctx: &mut Ctx, wheres: &[Predicate]) {
+fn write_wheres<D: Dialect>(ctx: &mut Ctx, wheres: &[Predicate<D>]) {
     // Skip empty groups so they neither emit `()` nor force a `WHERE`.
     if wheres.iter().all(is_omitted) {
         return;
@@ -484,7 +521,7 @@ fn write_wheres<D: Dialect>(ctx: &mut Ctx, wheres: &[Predicate]) {
 /// but a [`Predicate::Group`] attaches to the preceding clause using its own
 /// outer conjunction (so `or_where` emits `... OR (...)`). Empty groups are
 /// omitted and never contribute a separator.
-fn write_clause_list<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate]) {
+fn write_clause_list<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate<D>]) {
     let mut wrote_any = false;
     for p in preds.iter() {
         if is_omitted(p) {
@@ -506,7 +543,7 @@ fn write_clause_list<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate]) {
 }
 
 /// Render a list of predicates joined by `conj` (used inside groups).
-fn write_preds<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate], conj: Conj) {
+fn write_preds<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate<D>], conj: Conj) {
     let sep = match conj {
         Conj::And => " AND ",
         Conj::Or => " OR ",
@@ -519,7 +556,7 @@ fn write_preds<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate], conj: Conj) {
     }
 }
 
-fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate) {
+fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate<D>) {
     match pred {
         Predicate::Binary { col, op, val } => {
             let col = ctx.esc(col);
@@ -603,6 +640,28 @@ fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate) {
             // emit invalid `()`.
             ctx.sql.push('(');
             write_preds::<D>(ctx, preds, Conj::And);
+            ctx.sql.push(')');
+        }
+        Predicate::Column { lhs, op, rhs } => {
+            let l = ctx.esc(lhs);
+            let r = ctx.esc(rhs);
+            ctx.sql.push_str(&l);
+            ctx.sql.push(' ');
+            ctx.sql.push_str(op);
+            ctx.sql.push(' ');
+            ctx.sql.push_str(&r);
+        }
+        Predicate::Exists { neg, sub } => {
+            ctx.sql
+                .push_str(if *neg { "NOT EXISTS (" } else { "EXISTS (" });
+            compile_into::<D>(ctx, sub);
+            ctx.sql.push(')');
+        }
+        Predicate::InSubquery { col, neg, sub } => {
+            let col = ctx.esc(col);
+            ctx.sql.push_str(&col);
+            ctx.sql.push_str(if *neg { " NOT IN (" } else { " IN (" });
+            compile_into::<D>(ctx, sub);
             ctx.sql.push(')');
         }
     }

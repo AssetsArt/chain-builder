@@ -82,6 +82,7 @@ pub enum Having {
 }
 
 /// A common table expression (`WITH` / `WITH RECURSIVE`).
+#[derive(Debug, Clone, PartialEq)]
 pub struct Cte<D: Dialect> {
     /// Raw CTE name (escaped at compile time).
     pub name: String,
@@ -188,17 +189,24 @@ pub enum Method {
 }
 
 /// Typed, dialect-aware SQL query builder.
+#[derive(Debug, Clone, PartialEq)]
 pub struct QueryBuilder<D: Dialect> {
     pub(crate) table: String,
     /// Optional database/schema qualifier (multi-tenant: one connection, many DBs).
     /// When set, prefixes the main table and join tables: `"db"."table"`.
     pub(crate) db: Option<String>,
     pub(crate) select_cols: Vec<String>,
+    /// Raw `SELECT` expressions (verbatim, NOT escaped) with their own binds,
+    /// appended after `select_cols`. Backs `select_raw`.
+    pub(crate) select_raw: Vec<(String, Vec<Value>)>,
+    /// Subquery `SELECT` columns: `(alias, sub)` → `(<sub>) AS {esc alias}`,
+    /// appended after `select_cols` / `select_raw`. Backs `select_subquery`.
+    pub(crate) select_subqueries: Vec<(String, Box<QueryBuilder<D>>)>,
     /// `SELECT DISTINCT` flag (raw; off by default for M1 byte-identity).
     pub(crate) distinct: bool,
     /// `SELECT DISTINCT ON (cols)` columns (raw; Postgres-only).
     pub(crate) distinct_on: Vec<String>,
-    pub(crate) wheres: Vec<Predicate>,
+    pub(crate) wheres: Vec<Predicate<D>>,
     pub(crate) method: Method,
     pub(crate) set: Vec<(String, Value)>,
     /// Multi-row `INSERT` rows (empty unless `insert_many` was used). Each row is
@@ -232,6 +240,8 @@ impl<D: Dialect> QueryBuilder<D> {
             table: name.to_owned(),
             db: None,
             select_cols: Vec::new(),
+            select_raw: Vec::new(),
+            select_subqueries: Vec::new(),
             distinct: false,
             distinct_on: Vec::new(),
             wheres: Vec::new(),
@@ -271,6 +281,36 @@ impl<D: Dialect> QueryBuilder<D> {
         S: AsRef<str>,
     {
         self.select_cols = cols.into_iter().map(|c| c.as_ref().to_owned()).collect();
+        self
+    }
+
+    /// Add a raw `SELECT` expression (verbatim, NOT escaped) with optional binds
+    /// — the escape hatch for aggregates/functions like `COUNT(*)`.
+    ///
+    /// Appended to the column list after any [`Self::select`] columns. Multiple
+    /// calls accumulate.
+    ///
+    /// # Warning: positional placeholder contract
+    ///
+    /// `sql` is emitted **verbatim** (it is NOT escaped or renumbered) and any
+    /// `binds` are appended to the running bind list in order. For **Postgres**,
+    /// the caller MUST write `$N` numbers matching the actual bind position. For
+    /// MySQL/SQLite use `?`.
+    pub fn select_raw(mut self, sql: &str, binds: Option<Vec<Value>>) -> Self {
+        self.select_raw
+            .push((sql.to_owned(), binds.unwrap_or_default()));
+        self
+    }
+
+    /// Add a subquery `SELECT` column: emits `(<sub>) AS {alias}` after the
+    /// regular columns and any [`Self::select_raw`] expressions.
+    ///
+    /// The subquery is compiled with placeholder continuity (its binds appear in
+    /// `$N` order at the point it is emitted — before the `WHERE` clause, since
+    /// the SELECT list is rendered first). SELECT-only.
+    pub fn select_subquery(mut self, alias: &str, sub: QueryBuilder<D>) -> Self {
+        self.select_subqueries
+            .push((alias.to_owned(), Box::new(sub)));
         self
     }
 
@@ -427,6 +467,58 @@ impl<D: Dialect> QueryBuilder<D> {
         self.wheres.push(Predicate::Raw {
             sql: sql.to_owned(),
             binds,
+        });
+        self
+    }
+
+    /// `lhs op rhs` — compare two column identifiers (both escaped at compile
+    /// time), no bind. e.g. `where_column("orders.user_id", "=", "users.id")`.
+    pub fn where_column(mut self, lhs: &str, op: &'static str, rhs: &str) -> Self {
+        self.wheres.push(Predicate::Column {
+            lhs: lhs.to_owned(),
+            op,
+            rhs: rhs.to_owned(),
+        });
+        self
+    }
+
+    /// `EXISTS (subquery)` — takes an already-built sub-builder by value
+    /// (mirrors [`Self::union`] / [`Self::with`]). The sub-query is compiled
+    /// with placeholder continuity.
+    pub fn where_exists(mut self, sub: QueryBuilder<D>) -> Self {
+        self.wheres.push(Predicate::Exists {
+            neg: false,
+            sub: Box::new(sub),
+        });
+        self
+    }
+
+    /// `NOT EXISTS (subquery)`. See [`Self::where_exists`].
+    pub fn where_not_exists(mut self, sub: QueryBuilder<D>) -> Self {
+        self.wheres.push(Predicate::Exists {
+            neg: true,
+            sub: Box::new(sub),
+        });
+        self
+    }
+
+    /// `col IN (subquery)` — takes an already-built sub-builder by value. The
+    /// sub-query is compiled with placeholder continuity.
+    pub fn where_in_subquery(mut self, col: &str, sub: QueryBuilder<D>) -> Self {
+        self.wheres.push(Predicate::InSubquery {
+            col: col.to_owned(),
+            neg: false,
+            sub: Box::new(sub),
+        });
+        self
+    }
+
+    /// `col NOT IN (subquery)`. See [`Self::where_in_subquery`].
+    pub fn where_not_in_subquery(mut self, col: &str, sub: QueryBuilder<D>) -> Self {
+        self.wheres.push(Predicate::InSubquery {
+            col: col.to_owned(),
+            neg: true,
+            sub: Box::new(sub),
         });
         self
     }

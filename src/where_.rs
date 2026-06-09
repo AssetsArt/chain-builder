@@ -7,6 +7,7 @@
 
 use core::marker::PhantomData;
 
+use crate::builder::QueryBuilder;
 use crate::dialect::Dialect;
 use crate::value::{IntoBind, Value};
 
@@ -25,8 +26,12 @@ pub enum Conj {
 }
 
 /// A single WHERE-clause predicate.
+///
+/// Generic over the [`Dialect`] marker `D` because subquery-bearing variants
+/// ([`Predicate::Exists`] / [`Predicate::InSubquery`]) embed a
+/// [`QueryBuilder<D>`]; the recursion is broken with a `Box`.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Predicate {
+pub enum Predicate<D: Dialect> {
     /// `col op value`, e.g. `"age" > $1`.
     Binary {
         /// Raw identifier; escaped in compile.rs.
@@ -95,7 +100,33 @@ pub enum Predicate {
         /// How this group attaches to the preceding clause (outer separator).
         outer_conj: Conj,
         /// Inner predicates (always `AND`-joined in M1).
-        preds: Vec<Predicate>,
+        preds: Vec<Predicate<D>>,
+    },
+    /// `lhs op rhs` — both sides are column identifiers (escaped at compile
+    /// time), no bind. Backs `where_column`.
+    Column {
+        /// Raw left identifier; escaped in compile.rs.
+        lhs: String,
+        /// SQL operator token (`=`, `!=`, …).
+        op: &'static str,
+        /// Raw right identifier; escaped in compile.rs.
+        rhs: String,
+    },
+    /// `[NOT ]EXISTS (subquery)`.
+    Exists {
+        /// Whether this is `NOT EXISTS`.
+        neg: bool,
+        /// The embedded sub-query, compiled with placeholder continuity.
+        sub: Box<QueryBuilder<D>>,
+    },
+    /// `col [NOT ]IN (subquery)`.
+    InSubquery {
+        /// Raw identifier; escaped in compile.rs.
+        col: String,
+        /// Whether this is `NOT IN`.
+        neg: bool,
+        /// The embedded sub-query, compiled with placeholder continuity.
+        sub: Box<QueryBuilder<D>>,
     },
 }
 
@@ -114,7 +145,7 @@ pub enum Predicate {
 /// `OR` available is the *outer* attachment chosen by `or_where` (which emits
 /// `... OR (...)`). Nested groups and inner-`OR` are a documented M1 limitation.
 pub struct WhereBuilder<D: Dialect> {
-    preds: Vec<Predicate>,
+    preds: Vec<Predicate<D>>,
     _marker: PhantomData<D>,
 }
 
@@ -134,7 +165,7 @@ impl<D: Dialect> WhereBuilder<D> {
     }
 
     /// Consume the accumulator and return the collected predicates.
-    pub(crate) fn into_preds(self) -> Vec<Predicate> {
+    pub(crate) fn into_preds(self) -> Vec<Predicate<D>> {
         self.preds
     }
 
@@ -263,6 +294,18 @@ impl<D: Dialect> WhereBuilder<D> {
         self.preds.push(Predicate::Raw {
             sql: sql.to_owned(),
             binds,
+        });
+        self
+    }
+
+    /// `lhs op rhs` — compare two column identifiers (both escaped at compile
+    /// time), no bind. See
+    /// [`QueryBuilder::where_column`](crate::QueryBuilder::where_column).
+    pub fn where_column(mut self, lhs: &str, op: &'static str, rhs: &str) -> Self {
+        self.preds.push(Predicate::Column {
+            lhs: lhs.to_owned(),
+            op,
+            rhs: rhs.to_owned(),
         });
         self
     }
