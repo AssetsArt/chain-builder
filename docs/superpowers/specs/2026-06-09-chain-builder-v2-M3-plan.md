@@ -108,6 +108,46 @@ Per dialect, exact SQL:
   --features v2,sqlite,sqlx_sqlite`).
 - 1.x baseline **63**; no new `src/v2` clippy warnings.
 
+## Plan-review fixes (decisions — implementers MUST follow)
+
+- **Empty conflict target + Merge (B1/OQ5).** pg AND sqlite require a conflict
+  target for `DO UPDATE`. So for `OnConflict` style: emit `DO UPDATE SET …` ONLY
+  when `targets` is non-empty AND the SET list (inserted cols minus targets) is
+  non-empty. Otherwise emit `DO NOTHING` — `ON CONFLICT ({targets}) DO NOTHING` if
+  targets present, else bare `ON CONFLICT DO NOTHING`. (Covers both
+  empty-targets and all-cols-are-targets cases with valid SQL.)
+- **`upsert_style()` default impl (OQ1).** Add it to `Dialect` with a DEFAULT
+  `fn upsert_style() -> UpsertStyle { UpsertStyle::OnConflict }`; only `MySql`
+  overrides to `OnDuplicateKey`. (Non-breaking for any external `Dialect` impl,
+  and pg/sqlite need no override.)
+- **`RETURNING *` special-case (F4).** When emitting RETURNING / any column list
+  that may contain `*`, a `"*"` segment is pushed **unescaped** (`ctx.esc("*")`
+  would yield a quoted identifier). Reuse the existing `*`-aware path if present;
+  otherwise: `if c == "*" { push "*" } else { push ctx.esc(c) }`.
+- **SQLite RETURNING min version (B3).** Add a doc comment on `returning()` (and a
+  note in the crate-level v2 docs) that `RETURNING` requires **SQLite ≥ 3.35.0**
+  (2021) — `supports_returning()` is a compile-time dialect flag, not a runtime
+  version check.
+- **MySQL caveats (B2/F2/F3) — document on the API:**
+  - `on_conflict_merge` on MySQL emits `ON DUPLICATE KEY UPDATE c = VALUES(c)` for
+    ALL inserted columns (MySQL ignores the explicit `targets`; it uses its own
+    unique/primary keys). `VALUES()` is used for MySQL 5.7/8.x compatibility
+    (row-alias form deferred). Note: including a PK column in the insert set means
+    `pk = VALUES(pk)` appears — harmless but redundant.
+  - `on_conflict_do_nothing` on MySQL emits `INSERT IGNORE INTO …` (no ON-clause).
+    Document that `IGNORE` suppresses MORE than duplicate-key (also truncation /
+    bad-value coercion) — broader than pg/sqlite `DO NOTHING`.
+- **`EXCLUDED` casing (F1).** Emit uppercase `EXCLUDED` — it is an *unquoted,
+  case-insensitive identifier* accepted by both pg and sqlite. Do NOT escape it.
+- **INSERT-only doc (F5).** `on_conflict_*` and (for INSERT) the conflict clause
+  only render for `Method::Insert`; doc-comment that they are ignored on
+  UPDATE/DELETE. `returning` renders on INSERT/UPDATE/DELETE (pg/sqlite). Method
+  switching does NOT clear these fields (consistent with how `.insert()` doesn't
+  clear `wheres`) — intentional (OQ2). No debug_assert for MySQL-RETURNING-omit
+  (OQ3) — silent no-op, documented.
+- **Baseline.** Pre-existing 1.x `fmt`/`clippy -D warnings` drift is out of scope;
+  v2-scoped checks only.
+
 ## Out of M3 (deferred)
 - `on_conflict_merge_with([(col, value)])` (update to explicit bound values, not
   EXCLUDED) — M-later if needed.
