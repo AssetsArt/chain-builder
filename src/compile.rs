@@ -542,20 +542,6 @@ fn write_clause_list<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate<D>]) {
     }
 }
 
-/// Render a list of predicates joined by `conj` (used inside groups).
-fn write_preds<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate<D>], conj: Conj) {
-    let sep = match conj {
-        Conj::And => " AND ",
-        Conj::Or => " OR ",
-    };
-    for (i, p) in preds.iter().enumerate() {
-        if i > 0 {
-            ctx.sql.push_str(sep);
-        }
-        write_pred::<D>(ctx, p);
-    }
-}
-
 fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate<D>) {
     match pred {
         Predicate::Binary { col, op, val } => {
@@ -629,17 +615,21 @@ fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate<D>) {
             outer_conj: _,
             preds,
         } => {
-            // `outer_conj` controls how the group attaches to the preceding
-            // clause (handled in `write_clause_list`). Inner predicates are
-            // ALWAYS joined by `Conj::And` here: this is intentional for M1 —
-            // groups are flat AND-lists, and nested groups / inner-OR are a
-            // documented M1 limitation (see `WhereBuilder` docs, TG4).
+            // `outer_conj` controls how this group attaches to the *preceding*
+            // clause (handled in `write_clause_list`). The inner predicates are
+            // rendered with the SAME attach-conj logic as the top level
+            // (`write_clause_list`): each inner pred is joined with ` AND `
+            // unless it is itself a `Group` with `outer_conj == Conj::Or`, in
+            // which case it is joined with ` OR `. This enables M11 nested
+            // groups and inner-OR while staying byte-identical for the pre-M11
+            // case (a group whose preds are all non-`Group` predicates joins
+            // them all with ` AND `, exactly as the old hardcoded `Conj::And`).
             //
             // Empty groups never reach here: `write_clause_list` /
             // `write_wheres` filter them via `is_omitted` (F4), so we never
             // emit invalid `()`.
             ctx.sql.push('(');
-            write_preds::<D>(ctx, preds, Conj::And);
+            write_clause_list::<D>(ctx, preds);
             ctx.sql.push(')');
         }
         Predicate::Column { lhs, op, rhs } => {
