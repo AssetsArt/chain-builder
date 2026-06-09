@@ -104,6 +104,44 @@ unions:  Vec<(bool /*all*/, QueryBuilder<D>)>,
   bind → assert exact `$1`(cte) `$2`(main) `$3`(union) ordering and the bind vec
   matches; mysql/sqlite `?` equivalents; `WITH RECURSIVE`.
 
+## Plan-review fixes (decisions — implementers MUST follow)
+
+- **`_raw` Postgres `$N` contract (B1/OQ4/F3).** `having_raw` and `on_raw` are
+  verbatim escape hatches that inherit the exact `where_raw` limitation: for
+  Postgres the caller writes literal `$N` and is responsible for the offset (the
+  bind position = `binds.len()` at emit time, which in a CTE/UNION composition is
+  only known at compile time). Give `having_raw`/`on_raw` the SAME `/// Warning`
+  doc block as `where_raw`. The CTE→main→UNION acceptance test MUST use only
+  **structured** predicates (no pg-numbered `_raw`) so it doesn't depend on caller
+  offset arithmetic.
+- **OFFSET requires LIMIT (F2).** MySQL rejects bare `OFFSET`. Decision: in
+  `compile_into`, if `offset.is_some() && limit.is_none()` → `panic!("offset(...)
+  requires limit(...)")` (uniform across dialects). Document on `offset()`.
+- **CTE single-pass emission (F1).** The `ctes` loop writes each CTE's name header
+  AND compiles its body (`compile_into`) in ONE pass per CTE, so SQL text order ==
+  bind-push order (placeholder/bind never desync).
+- **`having(col,op,val)` vs `having_raw` (F3).** `having` escapes `col` (a real
+  column/alias → `"col" > ?`); aggregate expressions like `COUNT(*)` use
+  `having_raw`. Document this split (mirrors `where_raw`).
+- **Non-SELECT + M2 clauses (F5).** joins/groups/havings/orders/limit/offset/ctes/
+  unions render ONLY for `Method::Select`. For INSERT/UPDATE/DELETE they are
+  ignored (not rendered) — document; no panic.
+- **`JoinCond` enum (OQ1).** `enum JoinCond { On(String,&'static str,String),
+  OnVal(String,&'static str,Value), OnRaw(String,Vec<Value>) }` in one
+  `Vec<JoinCond>` per `Join`. (Cols in `On`/`OnVal` stored raw, escaped in
+  compile.)
+- **GROUP BY / ORDER BY dotted idents (OQ2).** `esc()` is already dotted-path
+  aware (`escape_identifier` splits on `.`), so `group_by(["t.col"])` →
+  `"t"."col"` correctly. GROUP BY of **expressions** (e.g. `YEAR(d)`) is out of
+  M2 scope (a `group_by_raw` is deferred) — document.
+- **CROSS JOIN (OQ5).** `cross_join(table)` takes **no** ON closure (CROSS JOIN
+  has no ON) — sidesteps the "conditions on a cross join" ambiguity entirely.
+- **Struct initializer (B2).** Add all new fields to `QueryBuilder::table()`'s
+  `Self { … }` initializer (mechanical; caught at first `cargo check`).
+- **Baseline note.** Pre-existing 1.x `fmt`/`clippy -D warnings` drift is NOT in
+  scope; run v2-scoped checks only (`clippy --features v2 | grep src/v2`), and
+  `cargo fmt` only `src/v2/` + new tests.
+
 ## Out of M2 (deferred)
 
 `DISTINCT ON`/jsonb/ILIKE (M5), upsert+RETURNING (M3), typed fetch (M4),
