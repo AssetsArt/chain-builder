@@ -39,7 +39,8 @@ feature-gated types `serde_json::Value` (`json`), `uuid::Uuid` (`uuid`), the
 `chrono` date/time types (`chrono`), and `rust_decimal::Decimal` (`decimal`).
 They are stored in an internal `Value` enum and bound to `sqlx` with the right
 type — never inlined into SQL. `Decimal` binds natively on Postgres/MySQL and as
-TEXT on SQLite (which has no native decimal type).
+TEXT on SQLite (which has no native decimal type) — note that on SQLite this makes
+comparisons/`ORDER BY` lexicographic, not numeric (`"19.99" < "5"`).
 
 ## WHERE
 

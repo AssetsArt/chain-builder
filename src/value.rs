@@ -44,6 +44,11 @@ pub enum Value {
     /// Fixed-point decimal for money/exact-numeric columns (requires the
     /// `decimal` feature). Bound natively on Postgres/MySQL (`NUMERIC`/`DECIMAL`)
     /// and as TEXT on SQLite (which has no native decimal type).
+    ///
+    /// **SQLite caveat:** because the value is bound as TEXT, comparison and
+    /// `ORDER BY` against a SQLite column are *lexicographic*, not numeric (e.g.
+    /// `"19.99" < "5"`). Use it for exact storage/round-trip; for numeric range
+    /// queries on SQLite, store a scaled integer or compare with `CAST(... AS REAL)`.
     #[cfg(feature = "decimal")]
     Decimal(rust_decimal::Decimal),
 }
