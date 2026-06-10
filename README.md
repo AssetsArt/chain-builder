@@ -32,7 +32,7 @@ parameters, automatic identifier escaping, dialect-correct placeholders
 ```toml
 [dependencies]
 # pick the driver(s) you need; the builder itself is driver-agnostic
-chain-builder = { version = "2", features = ["sqlx_postgres"] }
+chain-builder = { version = "3", features = ["sqlx_postgres"] }
 sqlx = { version = "0.9", features = ["postgres", "runtime-tokio-rustls"] }
 ```
 
