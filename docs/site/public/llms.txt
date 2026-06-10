@@ -1,0 +1,51 @@
+# Chain builder
+
+> A typed, dialect-aware SQL query builder for Rust. One builder API, generic over a `Dialect` marker type, targets PostgreSQL, MySQL, and SQLite — values are always bound parameters and identifiers are always escaped, by construction. Mixing dialects is a compile error, not a runtime surprise.
+
+Chain builder compiles a chained builder into `(sql, binds)` for any of three SQL dialects. Fallible `try_*` methods return a typed `BuildError`; the panicking twins stay for static, hand-written queries. It integrates with sqlx (`to_sqlx_query`, typed `fetch_*` helpers) but also works standalone. The crate name on crates.io is `chain-builder`.
+
+A single-file copy of the entire documentation is available at https://assetsart.github.io/chain-builder/llms-full.txt
+
+## Getting started
+
+- [Introduction](https://assetsart.github.io/chain-builder/introduction.html): The two safety properties (bound values, escaped identifiers) and where the named `*_raw` escape hatches are.
+- [Getting Started](https://assetsart.github.io/chain-builder/getting-started.html): Add the crate, build a first query, and hand off to sqlx.
+
+## Query building
+
+- [SELECT](https://assetsart.github.io/chain-builder/query/select.html): Columns, aliases, aggregate helpers, `distinct`/`distinct_on`, subquery columns.
+- [WHERE](https://assetsart.github.io/chain-builder/query/where.html): Comparisons, `IN`/`NULL`/`BETWEEN`, `and_where`/`or_where` groups, and subquery predicates.
+- [JOIN](https://assetsart.github.io/chain-builder/query/join.html): `INNER`/`LEFT`/`RIGHT`/`FULL`/`CROSS` joins and `ON` conditions.
+- [GROUP BY · HAVING · ORDER · LIMIT](https://assetsart.github.io/chain-builder/query/group-having-order-limit.html): Grouping, aggregate filters (allowlisted `having` operators), ordering, and pagination.
+- [CTE & UNION](https://assetsart.github.io/chain-builder/query/cte-union.html): `WITH` / `WITH RECURSIVE` common table expressions and `UNION` arms.
+- [INSERT · UPDATE · DELETE](https://assetsart.github.io/chain-builder/query/insert-update-delete.html): Writes, including UPDATE expressions (`set_raw`, `increment`, `decrement`).
+- [Upsert & RETURNING](https://assetsart.github.io/chain-builder/query/upsert-returning.html): `on_conflict_*` upserts and `RETURNING`.
+- [Row Locking](https://assetsart.github.io/chain-builder/query/locking.html): `FOR UPDATE` / `FOR SHARE` with `skip_locked` / `no_wait` (no-op on SQLite).
+- [Dynamic Building](https://assetsart.github.io/chain-builder/query/dynamic.html): Conditional clauses with `when` and optional filters done right.
+
+## Reference
+
+- [Binds & Values](https://assetsart.github.io/chain-builder/binds.html): The `Value` type, `IntoBind` conversions, nullable binds, and `to_sql_pretty`.
+- [Error Handling](https://assetsart.github.io/chain-builder/error-handling.html): `BuildError`, the unified `Error` enum, and the `try_*` twins.
+- [Executing with sqlx](https://assetsart.github.io/chain-builder/sqlx.html): `to_sqlx_query`, `to_sqlx_query_as`, and the typed `fetch_*` helpers.
+- [Dialect Differences](https://assetsart.github.io/chain-builder/dialects.html): Per-dialect quoting, placeholders, and feature support.
+
+## Cookbook
+
+- [HTTP Filters & Pagination](https://assetsart.github.io/chain-builder/cookbook/http-filters-pagination.html): Map request query parameters to filters safely.
+- [Mapping Errors to HTTP Status](https://assetsart.github.io/chain-builder/cookbook/http-error-mapping.html): Turn a `BuildError` into a 4xx/5xx response instead of a panic.
+- [Multi-tenant with `.db()`](https://assetsart.github.io/chain-builder/cookbook/multi-tenant.html): One connection, many databases/schemas.
+- [Bulk Insert & Upsert](https://assetsart.github.io/chain-builder/cookbook/bulk-insert-upsert.html): `insert_many` and conflict handling.
+- [Case-insensitive Search](https://assetsart.github.io/chain-builder/cookbook/search.html): `ILIKE`, `escape_like`, and explicit `ESCAPE` clauses.
+
+## Under the hood
+
+- [Security Model](https://assetsart.github.io/chain-builder/security.html): Why values are always bound, and the complete raw escape-hatch inventory.
+- [Internals](https://assetsart.github.io/chain-builder/internals.html): How the builder compiles to `(sql, binds)`.
+
+## Optional
+
+- [Full documentation (single file)](https://assetsart.github.io/chain-builder/llms-full.txt): Every page concatenated, for whole-context ingestion.
+- [API reference (docs.rs)](https://docs.rs/chain-builder): Generated rustdoc for the public API.
+- [Source (GitHub)](https://github.com/AssetsArt/chain-builder): Repository, issues, and changelog.
+- [crates.io](https://crates.io/crates/chain-builder): Releases and install instructions.
