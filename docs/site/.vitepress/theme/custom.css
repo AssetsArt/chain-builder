@@ -36,24 +36,33 @@ html.grainient-on .VPContent {
 
 /* ── Home: floating glass "pill" navbar over the grainient ──────────── */
 html.grainient-on .VPNav {
-  background-color: transparent;
+  background-color: transparent !important;
 }
-html.grainient-on .VPNavBar {
+/* Dark translucent glass in BOTH states. VitePress adds `.fill` on scroll and
+   paints the bar with the opaque light `--vp-nav-bg-color`; without this the
+   pill turns white and the light nav text becomes white-on-white. The
+   `!important` beats `.VPNavBar.fill`'s higher specificity. */
+html.grainient-on .VPNavBar,
+html.grainient-on .VPNavBar.fill {
   margin: 14px auto 0;
   max-width: calc(100% - 48px);
   padding: 0 10px;
   border-radius: 18px;
-  background-color: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.16);
+  background-color: rgba(10, 14, 20, 0.32) !important;
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   backdrop-filter: blur(14px) saturate(140%);
+}
+/* a touch more opaque once content scrolls behind it, for legibility */
+html.grainient-on .VPNavBar.fill {
+  background-color: rgba(10, 14, 20, 0.66) !important;
 }
 html.grainient-on .VPNavBar .container {
   max-width: none;
 }
 html.grainient-on .VPNavBar .divider,
 html.grainient-on .VPNavBar .curtain {
-  display: none;
+  display: none !important;
 }
 
 /* light nav content on the pill */
