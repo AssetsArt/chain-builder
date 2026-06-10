@@ -30,8 +30,9 @@ rewrites). Deploy to the same GitHub Pages target.
 The mdBook snippets carry SQL-output comments that are **byte-matched to test
 assertions** in `tests/` (snippet policy A from the 3.0/3.1 docs work). VitePress
 does not compile or run Rust snippets either — so this invariant is preserved by
-*not editing snippet bodies*. The port copies snippet text unchanged; only the
-fenced-block info string changes (`rust,ignore`/`rust,no_run` → `rust`).
+*not editing snippet bodies* beyond the two mechanical transforms below
+(info-string normalization + mdBook hidden-line removal). Neither touches a
+visible SQL-output comment, so the byte-match holds.
 
 ## Directory layout
 
@@ -77,12 +78,31 @@ For each of the 22 pages under `docs/book/src/`:
 2. Transform code-fence info strings: ` ```rust,ignore ` and ` ```rust,no_run `
    → ` ```rust `. Shiki (VitePress's highlighter) treats the whole token after
    the backticks as the language; `rust,ignore` is unrecognized and renders
-   unhighlighted. There are ~21 such fences across the pages.
-3. Leave internal `.md` relative links as-is. They are all sibling/`../`
+   unhighlighted. There are **156** such fences across the pages (151
+   `rust,ignore` + 5 `rust,no_run`); acceptance gate #2 below verifies none
+   remain.
+3. Remove mdBook hidden-lines inside rust fences. mdBook strips lines matching
+   `^#( |$)` (hash-space or bare hash) from rendered rust blocks; Shiki renders
+   them literally. There are exactly **2** such lines, both in
+   `getting-started.md` (the `# async fn demo(...) {` wrapper at line 94 and
+   `# Ok(()) }` at line 105) — strip them during the port. **Do NOT strip**
+   `#[derive(...)]` / `#[non_exhaustive]` / `#!...` attribute lines (mdBook
+   never hid those; they must render), and do NOT touch markdown `# ` H1
+   headings (those are outside fences — the page titles). The transform is:
+   inside a ` ```rust ` fence only, drop lines whose first two chars are `# `
+   or that are exactly `#`.
+4. Leave internal `.md` relative links as-is. They are all sibling/`../`
    relative (verified: `(security.md)`, `(../query/where.md)`, …) and resolve
    identically under the preserved directory structure; VitePress rewrites them
-   to clean URLs and **fails the build on any dead link** (the port's
-   completeness gate).
+   to clean URLs and **fails the build on any dead `.md` link** (the port's
+   completeness gate). Caveat: VitePress's dead-link check covers file targets
+   but NOT in-page/cross-page `#anchor` fragments. Five anchor links exist
+   (`#builderror-variants`, `#the-unified-error-enum`,
+   `#db-qualifies-join-tables-too`, `#groups-and_where--or_where`,
+   `security.md#escape-hatch-inventory-complete`); all resolve today and the
+   headings are unchanged by the verbatim port, so they stay valid — but they
+   are not build-enforced, so the dev-server eyeball check (gate #4) should
+   click them.
 
 `introduction.md` stays as the first guide page. `SUMMARY.md` and `book.toml`
 are NOT ported — their roles move to `config.mts`.
@@ -106,8 +126,12 @@ VitePress `layout: home` frontmatter:
 
 ## Theme & config (`.vitepress/config.mts`)
 
-- `base: '/chain-builder/'` (GitHub Pages project site).
-- `title: 'chain-builder'`, `description` from the crate.
+- `base: '/chain-builder/'` (GitHub Pages project site; no custom domain —
+  `book.toml` has no `site-url`/CNAME, deploy uses the `*.github.io/chain-builder/`
+  sub-path).
+- `title: 'chain-builder'`. `description`: use the `Cargo.toml` text
+  ("A typed, dialect-aware SQL query builder for Rust (PostgreSQL/MySQL/SQLite)")
+  as canonical, so the site `<meta>` matches the crate.
 - `themeConfig.search = { provider: 'local' }`.
 - `themeConfig.nav`: Guide (`/introduction`), Reference (`/binds`), Cookbook
   (`/cookbook/http-filters-pagination`), crates.io
@@ -168,7 +192,7 @@ starting point, not a hard contract).
 Same job shape (build → deploy), retargeted:
 
 - Triggers: `paths` `docs/book/**` → `docs/site/**` (keep the workflow-self
-  path).
+  path). Retain the workflow-level `permissions: contents: read`.
 - Build job: `actions/checkout@v5`, `actions/setup-node@v4` (Node 20, `cache:
   npm`, `cache-dependency-path: docs/site/package-lock.json`), `npm ci` +
   `npm run docs:build` (both run in `docs/site`), then
@@ -182,7 +206,9 @@ Same job shape (build → deploy), retargeted:
    **dead-link detection** failing the build is the port-completeness check —
    any broken ported link blocks the build.
 2. No `,ignore` / `,no_run` info strings remain in `docs/site/**/*.md`
-   (`grep -rn ',ignore\|,no_run' docs/site` returns nothing).
+   (`grep -rn ',ignore\|,no_run' docs/site` returns nothing), and the two
+   mdBook hidden-lines are gone (`grep -rn '^# async fn demo\|^# Ok(()) }'
+   docs/site` returns nothing).
 3. All 22 pages appear in the sidebar; the page set matches the old
    `SUMMARY.md` exactly.
 4. `npm run docs:dev` opened once and eyeballed: hero renders, green brand
