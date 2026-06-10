@@ -101,7 +101,7 @@ Six methods accept raw SQL. All six share the same contract:
 | Method | Where the fragment lands |
 |---|---|
 | `select_raw(sql, Option<Vec<Value>>)` | SELECT column list, after structured columns |
-| `where_raw(sql, Vec<Value>)` | WHERE clause, as one predicate |
+| `where_raw(sql, Vec<Value>)` | WHERE clause, as one predicate (also available on the group builder inside `and_where`/`or_where`) |
 | `group_by_raw(sql, Vec<Value>)` | GROUP BY, after structured columns |
 | `order_by_raw(sql, Vec<Value>)` | ORDER BY, after structured terms |
 | `having_raw(sql, Vec<Value>)` | HAVING, as one term |

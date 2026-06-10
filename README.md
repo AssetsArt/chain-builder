@@ -85,12 +85,6 @@ QueryBuilder::<MySql>::table("users").select(["id"]).where_eq("status", "active"
 // SELECT `id` FROM `users` WHERE `status` = ?
 ```
 
-## Documentation
-
-- **[Guide](docs/guide.md)** — full reference: every WHERE/JOIN/CTE/UNION/aggregate
-  method, upsert & RETURNING, typed fetch, dynamic building, and the `Dialect`/
-  `IntoBind` model.
-
 ## Security
 
 Two axes of SQL-injection safety:

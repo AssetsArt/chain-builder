@@ -90,6 +90,10 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     )
     .to_sql();
 // SELECT "id", "name" FROM "users" WHERE "status" = $1 AND LOWER("name") LIKE LOWER($2) ESCAPE '\'
+
+On MySQL, write the escape literal as `ESCAPE '\\'` — inside a MySQL string
+literal a single backslash escapes the closing quote, so `'\'` is a syntax
+error. (SQLite accepts `'\'` as-is.)
 ```
 
 Now `50%` matches only names containing the literal text `50%`. Mind the

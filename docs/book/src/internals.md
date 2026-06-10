@@ -42,7 +42,7 @@ renumbering step, no fragment stitching. The invariant that falls out:
 
 That invariant *is* the Postgres `$N` continuity guarantee. Clauses are
 emitted in a fixed order — CTE bodies first, then the SELECT list (including
-subquery columns), JOIN conditions, WHERE, HAVING, LIMIT/OFFSET, then UNION
+subquery columns), JOIN conditions, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT/OFFSET, then UNION
 arms — and the counter just keeps running across all of them:
 
 ```rust,ignore
