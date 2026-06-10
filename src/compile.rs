@@ -7,7 +7,7 @@
 
 use crate::builder::{
     ConflictAction, Cte, Having, Join, JoinCond, JoinKind, Lock, LockStrength, LockWait, Method,
-    Order, QueryBuilder, SelectExpr,
+    Order, QueryBuilder, SelectExpr, SetExpr,
 };
 use crate::dialect::{Dialect, UpsertStyle};
 use crate::error::BuildError;
@@ -207,7 +207,7 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) -> Result<(), B
             write_returning::<D>(ctx, &qb.returning);
         }
         Method::Update => {
-            if qb.set.is_empty() {
+            if qb.set.is_empty() && qb.set_exprs.is_empty() {
                 return Err(BuildError::EmptyUpdate);
             }
             let mut rows: Vec<&(String, Value)> = qb.set.iter().collect();
@@ -223,6 +223,29 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) -> Result<(), B
                 ctx.sql.push_str(&col);
                 ctx.sql.push_str(" = ");
                 ctx.placeholder::<D>(v.clone());
+            }
+            for (i, ex) in qb.set_exprs.iter().enumerate() {
+                if i > 0 || !rows.is_empty() {
+                    ctx.sql.push_str(", ");
+                }
+                match ex {
+                    SetExpr::Raw { col, expr, binds } => {
+                        let col = ctx.esc(col);
+                        ctx.sql.push_str(&col);
+                        ctx.sql.push_str(" = ");
+                        // Verbatim escape hatch (see `set_raw` docs).
+                        ctx.sql.push_str(expr);
+                        ctx.binds.extend(binds.iter().cloned());
+                    }
+                    SetExpr::Step { col, by, neg } => {
+                        let col = ctx.esc(col);
+                        ctx.sql.push_str(&col);
+                        ctx.sql.push_str(" = ");
+                        ctx.sql.push_str(&col);
+                        ctx.sql.push_str(if *neg { " - " } else { " + " });
+                        ctx.placeholder::<D>(by.clone());
+                    }
+                }
             }
             write_wheres::<D>(ctx, &qb.wheres)?;
             write_returning::<D>(ctx, &qb.returning);

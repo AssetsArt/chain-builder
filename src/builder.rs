@@ -228,6 +228,33 @@ pub enum SelectExpr {
     },
 }
 
+/// A structured or raw `SET` expression for UPDATE. Backs
+/// [`QueryBuilder::set_raw`] / [`QueryBuilder::increment`] /
+/// [`QueryBuilder::decrement`]. Rendered after the (sorted) structured
+/// `update()` columns, in call order.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum SetExpr {
+    /// `{esc col} = {expr verbatim}` with its own binds (NOT escaped or
+    /// renumbered — the `where_raw` contract).
+    Raw {
+        /// Column identifier; escaped in compile.rs.
+        col: String,
+        /// Verbatim RHS expression.
+        expr: String,
+        /// Binds appended to the running bind list in order.
+        binds: Vec<Value>,
+    },
+    /// `{esc col} = {esc col} {+|-} {placeholder}` — structured step.
+    Step {
+        /// Column identifier; escaped in compile.rs.
+        col: String,
+        /// The step amount, bound via the normal placeholder machinery.
+        by: Value,
+        /// `false` → `+` (increment); `true` → `-` (decrement).
+        neg: bool,
+    },
+}
+
 /// The strength of a row-locking clause.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LockStrength {
@@ -301,6 +328,9 @@ pub struct QueryBuilder<D: Dialect> {
     pub(crate) wheres: Vec<Predicate<D>>,
     pub(crate) method: Method,
     pub(crate) set: Vec<(String, Value)>,
+    /// UPDATE `SET` expressions, rendered after the sorted `set` pairs in
+    /// call order. Backs `set_raw`/`increment`/`decrement`.
+    pub(crate) set_exprs: Vec<SetExpr>,
     /// Multi-row `INSERT` rows (empty unless `insert_many` was used). Each row is
     /// a `(column, value)` list; columns come from the first row's sorted keys.
     pub(crate) insert_rows: Vec<Vec<(String, Value)>>,
@@ -346,6 +376,7 @@ impl<D: Dialect> QueryBuilder<D> {
             wheres: Vec::new(),
             method: Method::Select,
             set: Vec::new(),
+            set_exprs: Vec::new(),
             insert_rows: Vec::new(),
             joins: Vec::new(),
             groups: Vec::new(),
@@ -766,6 +797,77 @@ impl<D: Dialect> QueryBuilder<D> {
             .into_iter()
             .map(|(k, v)| (k.as_ref().to_owned(), v.into_bind()))
             .collect();
+        self
+    }
+
+    /// Set a column to a **verbatim** SQL expression — the UPDATE escape
+    /// hatch. Switches the builder to UPDATE, like [`Self::update`] (and
+    /// like every method-selecting call, last one wins: switching away from
+    /// UPDATE afterwards leaves the expressions ignored).
+    ///
+    /// `col` is identifier-escaped; `expr` is emitted verbatim with `binds`
+    /// appended. Expressions render after the (sorted) structured
+    /// [`Self::update`] columns, in call order. Duplicate target columns are
+    /// not detected — the database reports them.
+    ///
+    /// # Warning: positional placeholder contract
+    ///
+    /// `expr` is NOT escaped or renumbered. For **Postgres**, hand-write
+    /// `$N` matching the actual bind position — `SET` precedes `WHERE`, so
+    /// that is `structured SET binds + binds of earlier expressions + 1`,
+    /// `+2`, … For MySQL/SQLite use `?`. A wrong `$N` produces a malformed
+    /// query.
+    ///
+    /// ```
+    /// use chain_builder::{Postgres, QueryBuilder, Value};
+    /// let (sql, binds) = QueryBuilder::<Postgres>::table("t")
+    ///     .update([("name", "x")])
+    ///     .set_raw("updated_at", "NOW()", vec![])
+    ///     .to_sql();
+    /// assert_eq!(sql, r#"UPDATE "t" SET "name" = $1, "updated_at" = NOW()"#);
+    /// assert_eq!(binds, vec![Value::Text("x".into())]);
+    /// ```
+    pub fn set_raw(mut self, col: &str, expr: &str, binds: Vec<Value>) -> Self {
+        self.method = Method::Update;
+        self.set_exprs.push(SetExpr::Raw {
+            col: col.to_owned(),
+            expr: expr.to_owned(),
+            binds,
+        });
+        self
+    }
+
+    /// `col = col + value` — atomic counter increment. Structured (column
+    /// escaped, value bound); switches the builder to UPDATE, so
+    /// `qb.increment("views", 1)` alone is a valid UPDATE.
+    ///
+    /// ```
+    /// use chain_builder::{Postgres, QueryBuilder, Value};
+    /// let (sql, binds) = QueryBuilder::<Postgres>::table("t")
+    ///     .increment("views", 1i64)
+    ///     .to_sql();
+    /// assert_eq!(sql, r#"UPDATE "t" SET "views" = "views" + $1"#);
+    /// assert_eq!(binds, vec![Value::I64(1)]);
+    /// ```
+    pub fn increment(mut self, col: &str, by: impl IntoBind) -> Self {
+        self.method = Method::Update;
+        self.set_exprs.push(SetExpr::Step {
+            col: col.to_owned(),
+            by: by.into_bind(),
+            neg: false,
+        });
+        self
+    }
+
+    /// `col = col - value` — atomic counter decrement. See
+    /// [`Self::increment`].
+    pub fn decrement(mut self, col: &str, by: impl IntoBind) -> Self {
+        self.method = Method::Update;
+        self.set_exprs.push(SetExpr::Step {
+            col: col.to_owned(),
+            by: by.into_bind(),
+            neg: true,
+        });
         self
     }
 

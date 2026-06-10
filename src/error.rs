@@ -32,7 +32,7 @@ pub enum BuildError {
     DistinctOnRequiresPostgres,
     /// `insert()` with no columns.
     EmptyInsert,
-    /// `update()` with no columns.
+    /// `update()` with no columns and no `SET` expressions.
     EmptyUpdate,
     /// `offset(...)` without `limit(...)`.
     OffsetWithoutLimit,
