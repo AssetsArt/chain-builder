@@ -26,9 +26,9 @@ Code blocks in the book are marked ```` ```rust,ignore ```` (builder-only
 snippets) or ```` ```rust,no_run ```` (async/sqlx snippets). Snippets are
 copied/adapted from real tested code (rustdoc doctests, `tests/*.rs`) wherever
 one exists, so drift risk is bounded by the crate's own test suite. The book
-is an explanation layer, not a test layer. `mdbook build` (which validates
-SUMMARY links and intra-book links via default link preprocessing) is the only
-CI gate for the book.
+is an explanation layer, not a test layer. `mdbook build` with `create-missing = false` (which fails on missing SUMMARY
+targets; note it does NOT validate inter-page hyperlinks) is the only CI gate
+for the book.
 
 Convention for SQL output in examples: show the generated SQL as a comment
 under the builder chain, Postgres dialect unless the section is
@@ -95,21 +95,24 @@ policy, cross-links to related pages, and — where behavior differs by dialect
    dialect (placeholders, upsert style, RETURNING, DISTINCT ON, row locking,
    native ILIKE), links: crates.io, docs.rs, GitHub, CHANGELOG.
 2. **Getting Started** — install table (feature flags incl. json/uuid/chrono/
-   decimal), first query, `to_sql()` vs `try_to_sql()` in one paragraph,
+   decimal), **the `default = ["sqlx_mysql"]` gotcha** (Postgres/SQLite users
+   must add `default-features = false` or they silently compile the MySQL
+   driver), first query, `to_sql()` vs `try_to_sql()` in one paragraph,
    executing with sqlx teaser.
 3. **SELECT** — `select`, `select_as`, aggregates (`select_count[_as]`/sum/avg/
    min/max), `select_raw` (+ placeholder contract warning), `select_subquery`,
    `distinct`, `distinct_on` (pg-only, BuildError elsewhere).
 4. **WHERE** — all predicates (`where_eq/ne/gt/gte/lt/lte`, `where_in/not_in`
    + empty-IN semantics `1 = 0`/`1 = 1`, `where_null/not_null`,
-   `where_between`, `where_ilike` + per-dialect lowering, `where_json_contains`,
-   `where_column`, `where_exists/not_exists`, `where_in_subquery/not_in`),
+   `where_between`, `where_like` (wildcards in user input are NOT escaped — caveat here, referenced by the search cookbook), `where_ilike` + per-dialect lowering, `where_jsonb_contains` (emits `@>` verbatim on ALL dialects — meaningful only on Postgres jsonb; page must carry this dialect note),
+   `where_column`, `where_exists`/`where_not_exists`, `where_in_subquery`/`where_not_in_subquery`),
    groups `and_where`/`or_where` (+ nesting, empty-group omission),
    `where_raw` escape hatch.
 5. **JOIN** — kinds (inner/left/right/full outer/cross), `on`/`on_val`/`on_raw`,
    `.db()` qualifier interaction.
 6. **GROUP BY · HAVING · ORDER · LIMIT** — `group_by[_raw]`, `having`
-   (operator allowlist → deferred BuildError), `having_raw` ($N contract),
+   (operator allowlist — matched case-insensitively, stored trimmed → deferred
+   BuildError), `having_raw` ($N contract),
    `order_by[_asc/_desc/_raw]`, `limit`/`offset` (offset-requires-limit),
    `paginate`.
 7. **CTE & UNION** — `with`/`with_recursive`, `union`/`union_all`, bind
@@ -117,7 +120,7 @@ policy, cross-links to related pages, and — where behavior differs by dialect
 8. **INSERT · UPDATE · DELETE** — `insert`, `insert_many` (NULL-padding of
    ragged rows), sorted-column determinism, `update`, `delete`, empty-set
    errors.
-9. **Upsert & RETURNING** — `on_conflict` targets + `DoNothing`/`Merge`,
+9. **Upsert & RETURNING** — `on_conflict_do_nothing(targets)` / `on_conflict_merge(targets)` (the only two upsert entry points; `ConflictAction` is AST-only, never passed by users),
    per-dialect rendering (pg/sqlite `ON CONFLICT`, mysql
    `INSERT IGNORE`/`ON DUPLICATE KEY UPDATE`), `returning` (no-op on MySQL).
 10. **Row Locking** — `for_update`/`for_share`, `skip_locked`/`no_wait`,
@@ -125,7 +128,7 @@ policy, cross-links to related pages, and — where behavior differs by dialect
 11. **Dynamic Building** — `when`/`when_else`, building from request params,
     builder reuse/clone, `paginate`.
 12. **Binds & Values** — `IntoBind` impls table (ints→I64 incl. u64 wrap note,
-    floats→F64, bool, strings, bytes, `Option<T>`→Null), feature-gated values
+    floats→F64, bool, strings, bytes, `Option<T>`: `None`→Null, `Some`→inner value), feature-gated values
     (json/uuid/chrono/decimal incl. sqlite-decimal-as-TEXT note).
 13. **Error Handling** — `BuildError` variants table, `try_to_sql`/`try_compile`/
     `try_to_sqlx_query[_as]` vs panicking twins + the documented policy,
@@ -133,8 +136,7 @@ policy, cross-links to related pages, and — where behavior differs by dialect
     `#[non_exhaustive]` wildcard-arm requirement, HTTP 4XX/5XX mapping,
     "since 3.0" note (fetch_* error type changed).
 14. **Executing with sqlx** — feature flags, `to_sqlx_query[_as]` + try twins,
-    `fetch_all/one/optional`, `execute`, `count` (wrapping), `fetch_scalar
-    [_optional]`, `SqlxQuery`/`SqlxQueryAs` aliases.
+    `fetch_all/one/optional`, `execute`, `count` (wrapping), `fetch_scalar`/`fetch_optional_scalar`, `SqlxQuery`/`SqlxQueryAs` aliases.
 15. **Dialect Differences** — one table: placeholder, quote char, upsert style,
     RETURNING, DISTINCT ON, row locking, ILIKE; prose notes per row.
 16. **Cookbook: HTTP filters & pagination** — axum handler: query params →
@@ -143,7 +145,7 @@ policy, cross-links to related pages, and — where behavior differs by dialect
     500, `IntoResponse` example.
 18. **Cookbook: Multi-tenant `.db()`** — one pool, many schemas; join
     qualification.
-19. **Cookbook: Bulk insert & upsert** — `insert_many` + `on_conflict` merge;
+19. **Cookbook: Bulk insert & upsert** — `insert_many` + `on_conflict_merge`;
     batching note.
 20. **Cookbook: Case-insensitive search** — `where_ilike` portability,
     `LIKE`-escaping caveat (user input wildcards are NOT escaped — document).
@@ -153,7 +155,10 @@ policy, cross-links to related pages, and — where behavior differs by dialect
     `having_raw`, `on_raw` — verbatim, caller-audited), what is NOT protected
     (raw SQL fragments, LIKE wildcards, identifier *names* from untrusted
     input policy).
-22. **Internals** — single-pass `Ctx` compiler, placeholder numbering
+22. **Internals** — scope note: the publicly re-exported AST types (`Predicate`,
+    `Having`, `OnConflict`, …) are advanced API and deliberately NOT documented
+    page-by-page — one paragraph acknowledges them and points to docs.rs;
+    single-pass `Ctx` compiler, placeholder numbering
     continuity ($N across CTE/where/limit), identifier escaping chokepoint
     (`ctx.esc`), deferred-error flow, byte-identity discipline & sorted
     columns.
@@ -164,6 +169,8 @@ policy, cross-links to related pages, and — where behavior differs by dialect
 - `[output.html]`: `git-repository-url` → GitHub repo, `edit-url-template` →
   `.../edit/main/docs/book/{path}`, default theme, built-in search enabled
   (default)
+- `[build] create-missing = false` — otherwise mdBook silently creates empty
+  files for missing SUMMARY targets instead of failing
 - build dir default (`book`) — covered by .gitignore entry `docs/book/book/`
 
 ## CI/CD (docs.yml)
@@ -206,3 +213,5 @@ policy, cross-links to related pages, and — where behavior differs by dialect
 - mdBook install method in CI (action vs binary download) — plan decides,
   pinned either way.
 - Exact README wording for the Documentation section.
+- Pages enablement permission: confirmed — `gh api` against the repo works with
+  admin scope (404 on GET /pages simply means not yet enabled).
