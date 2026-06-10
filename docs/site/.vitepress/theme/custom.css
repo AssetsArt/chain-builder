@@ -23,3 +23,86 @@
     min-width: 280px;
   }
 }
+
+/* ── Home: animated grainient hero (canvas in GrainientBackground.vue) ── */
+/* While the grainient canvas is mounted (home only), make the page chrome
+   transparent so the fixed z-index:-1 canvas shows through. */
+html.grainient-on,
+html.grainient-on body,
+html.grainient-on .Layout,
+html.grainient-on .VPContent {
+  background-color: transparent;
+}
+
+/* ── Home: floating glass "pill" navbar over the grainient ──────────── */
+html.grainient-on .VPNav {
+  background-color: transparent;
+}
+html.grainient-on .VPNavBar {
+  margin: 14px auto 0;
+  max-width: calc(100% - 48px);
+  padding: 0 10px;
+  border-radius: 18px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+html.grainient-on .VPNavBar .container {
+  max-width: none;
+}
+html.grainient-on .VPNavBar .divider,
+html.grainient-on .VPNavBar .curtain {
+  display: none;
+}
+
+/* light nav content on the pill */
+html.grainient-on .VPNavBarTitle .title {
+  color: #fff;
+}
+html.grainient-on .VPNavBarMenuLink {
+  color: rgba(255, 255, 255, 0.82);
+}
+html.grainient-on .VPNavBarMenuLink:hover {
+  color: #fff;
+}
+html.grainient-on .VPSocialLink,
+html.grainient-on .VPNavBarExtra .button,
+html.grainient-on .VPSwitchAppearance {
+  color: #fff;
+}
+
+/* search button blended into the pill */
+html.grainient-on .DocSearch-Button {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+html.grainient-on .DocSearch-Button .DocSearch-Search-Icon,
+html.grainient-on .DocSearch-Button-Placeholder,
+html.grainient-on .DocSearch-Button-Keys kbd {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* light text over the dark gradient */
+.VPHome .VPHero .text {
+  color: #fff;
+}
+.VPHome .VPHero .tagline {
+  color: rgba(255, 255, 255, 0.74);
+}
+.VPHome .VPHero .name {
+  --vp-home-hero-name-background: linear-gradient(120deg, #1bcf96, #27aeff);
+}
+
+/* translucent feature cards so the gradient shows through */
+.VPHome .VPFeature {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+}
+.VPHome .VPFeature .title {
+  color: #fff;
+}
+.VPHome .VPFeature .details {
+  color: rgba(255, 255, 255, 0.66);
+}

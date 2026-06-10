@@ -36,7 +36,12 @@ export default defineConfig({
   description:
     'A typed, dialect-aware SQL query builder for Rust (PostgreSQL/MySQL/SQLite)',
   base: '/chain-builder/',
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/chain-builder/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/x-icon', href: '/chain-builder/favicon.ico' }],
+  ],
   themeConfig: {
+    logo: '/logo.svg',
     search: { provider: 'local' },
     nav: [
       { text: 'Guide', link: '/introduction' },
