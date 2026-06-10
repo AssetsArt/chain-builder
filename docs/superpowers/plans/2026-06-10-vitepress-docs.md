@@ -140,6 +140,15 @@ function walk(dir) {
   return out
 }
 
+// Split a line into (prefix, content) where prefix is leading whitespace plus
+// any markdown blockquote markers (`>`), so fences keep working inside
+// blockquote callouts (`> ```rust,ignore`) and indented list items.
+function split(line) {
+  const m = line.match(/^(\s*(?:>\s?)*)/)
+  const prefix = m ? m[1] : ''
+  return [prefix, line.slice(prefix.length)]
+}
+
 let fences = 0
 let hidden = 0
 for (const src of walk(SRC)) {
@@ -149,28 +158,27 @@ for (const src of walk(SRC)) {
   const result = []
   let inRust = false
   for (const line of lines) {
-    const trimmed = line.trimStart()
-    if (!inRust && trimmed.startsWith('```')) {
-      const info = trimmed.slice(3).trim()
+    const [prefix, content] = split(line)
+    if (!inRust && content.startsWith('```')) {
+      const info = content.slice(3).trim()
       const lang = info.split(/[,\s]/)[0]
       if (lang === 'rust') {
         inRust = true
         fences++
-        const indent = line.slice(0, line.length - trimmed.length)
-        result.push(indent + '```rust') // normalize rust,ignore / rust,no_run → rust
+        result.push(prefix + '```rust') // normalize rust,ignore / rust,no_run → rust
         continue
       }
       result.push(line)
       continue
     }
     if (inRust) {
-      if (trimmed.startsWith('```')) {
+      if (content.startsWith('```')) {
         inRust = false
         result.push(line)
         continue
       }
       // mdBook hidden-line: "# ..." or bare "#" (NOT "#[" / "#!" attributes).
-      if (trimmed.startsWith('# ') || trimmed === '#') {
+      if (content.startsWith('# ') || content === '#') {
         hidden++
         continue
       }
