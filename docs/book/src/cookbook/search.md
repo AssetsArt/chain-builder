@@ -68,7 +68,7 @@ The portable fix is an explicit `ESCAPE` clause, which the structured
 [`where_raw`](../query/where.md) job:
 
 ```rust,ignore
-use chain_builder::{Postgres, QueryBuilder, Value};
+use chain_builder::{escape_like, Postgres, QueryBuilder, Value};
 
 let q = "50%"; // raw user input
 let pattern = format!("%{}%", escape_like(q)); // "%50\%%"

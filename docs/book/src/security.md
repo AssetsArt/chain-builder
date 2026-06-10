@@ -89,7 +89,7 @@ the type level everywhere else.
 
 ## Escape-hatch inventory (complete)
 
-Six methods accept raw SQL. All six share the same contract:
+Seven methods accept raw SQL. All seven share the same contract:
 
 > The fragment is emitted **verbatim** — not escaped, not validated, not
 > renumbered. Its binds are appended to the running bind list in order. On
@@ -105,6 +105,7 @@ Six methods accept raw SQL. All six share the same contract:
 | `group_by_raw(sql, Vec<Value>)` | GROUP BY, after structured columns |
 | `order_by_raw(sql, Vec<Value>)` | ORDER BY, after structured terms |
 | `having_raw(sql, Vec<Value>)` | HAVING, as one term |
+| `set_raw(col, sql, Vec<Value>)` | UPDATE SET, as `"col" = <fragment>` after the structured columns (the column identifier IS escaped; only the right-hand side is verbatim) |
 | `JoinClause::on_raw(sql, Vec<Value>)` | JOIN … ON, as one condition |
 
 Never feed request input — even "just a column name" — into a raw fragment.

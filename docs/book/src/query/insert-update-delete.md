@@ -181,8 +181,10 @@ valid SQL, so the compiler refuses to render it:
 
 - empty `insert(…)` / `insert_many(…)` → `BuildError::EmptyInsert`
   (`insert() requires at least one column`)
-- empty `update(…)` → `BuildError::EmptyUpdate`
-  (`update() requires at least one column`)
+- `update(…)` with no columns **and** no `SET` expressions →
+  `BuildError::EmptyUpdate` (`update() requires at least one column`).
+  An empty `update(…)` plus an `increment`/`decrement`/`set_raw` is a
+  valid UPDATE (3.1.0+).
 
 As always, [`try_to_sql()`](../error-handling.md) returns the error and
 `to_sql()` panics with the same message:
