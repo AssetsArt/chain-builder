@@ -327,4 +327,47 @@ impl<D: Dialect> WhereBuilder<D> {
         });
         self
     }
+
+    /// `EXISTS (subquery)` inside this group. Mirrors
+    /// [`QueryBuilder::where_exists`](crate::QueryBuilder::where_exists) —
+    /// same contract, including placeholder continuity into the sub-query.
+    pub fn where_exists(mut self, sub: QueryBuilder<D>) -> Self {
+        self.preds.push(Predicate::Exists {
+            neg: false,
+            sub: Box::new(sub),
+        });
+        self
+    }
+
+    /// `NOT EXISTS (subquery)` inside this group. See
+    /// [`QueryBuilder::where_not_exists`](crate::QueryBuilder::where_not_exists).
+    pub fn where_not_exists(mut self, sub: QueryBuilder<D>) -> Self {
+        self.preds.push(Predicate::Exists {
+            neg: true,
+            sub: Box::new(sub),
+        });
+        self
+    }
+
+    /// `col IN (subquery)` inside this group. Mirrors
+    /// [`QueryBuilder::where_in_subquery`](crate::QueryBuilder::where_in_subquery).
+    pub fn where_in_subquery(mut self, col: &str, sub: QueryBuilder<D>) -> Self {
+        self.preds.push(Predicate::InSubquery {
+            col: col.to_owned(),
+            neg: false,
+            sub: Box::new(sub),
+        });
+        self
+    }
+
+    /// `col NOT IN (subquery)` inside this group. See
+    /// [`QueryBuilder::where_not_in_subquery`](crate::QueryBuilder::where_not_in_subquery).
+    pub fn where_not_in_subquery(mut self, col: &str, sub: QueryBuilder<D>) -> Self {
+        self.preds.push(Predicate::InSubquery {
+            col: col.to_owned(),
+            neg: true,
+            sub: Box::new(sub),
+        });
+        self
+    }
 }
