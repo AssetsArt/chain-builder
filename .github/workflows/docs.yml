@@ -1,9 +1,9 @@
 name: Docs
 
-# Builds the mdBook documentation site and deploys it to GitHub Pages.
+# Builds the VitePress documentation site and deploys it to GitHub Pages.
 #
 # Triggers:
-#   - Pushing to `main` when the book or this workflow changes — build + deploy.
+#   - Pushing to `main` when the site or this workflow changes — build + deploy.
 #   - Pull requests touching the same paths — build only (no deploy).
 #   - Manually via the "Run workflow" button (workflow_dispatch).
 
@@ -11,11 +11,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "docs/book/**"
+      - "docs/site/**"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
-      - "docs/book/**"
+      - "docs/site/**"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -28,26 +28,31 @@ concurrency:
 
 jobs:
   build:
-    name: Build book
+    name: Build site
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Install mdBook
-        run: |
-          mkdir -p "$HOME/.local/bin"
-          curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.5.3/mdbook-v0.5.3-x86_64-unknown-linux-gnu.tar.gz \
-            | tar -xz -C "$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs/site/package-lock.json
+
+      - name: Install
+        working-directory: docs/site
+        run: npm ci
 
       - name: Build
-        run: mdbook build docs/book
+        working-directory: docs/site
+        run: npm run docs:build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/book/book
+          path: docs/site/.vitepress/dist
 
   deploy:
     name: Deploy to GitHub Pages

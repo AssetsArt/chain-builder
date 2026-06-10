@@ -14,7 +14,7 @@ first.
 single comma-separated `WITH` header. The CTE name is escaped like any
 identifier; the body is a complete sub-builder:
 
-```rust,ignore
+```rust
 let cte = QueryBuilder::<Postgres>::table("logs")
     .select(["n"])
     .where_gt("n", 1i64)
@@ -39,7 +39,7 @@ Note the numbering: the CTE body owns `$1`/`$2`, the main query continues at
 `WITH` keyword per statement, so if **any** CTE in the chain is recursive,
 that one `WITH` carries `RECURSIVE` for all of them:
 
-```rust,ignore
+```rust
 let cte = QueryBuilder::<Postgres>::table("t").select(["n"]);
 let (sql, _) = QueryBuilder::<Postgres>::table("t")
     .with_recursive("t", cte)
@@ -56,7 +56,7 @@ union; the builder does not validate recursion structure, the database does.)
 Each call appends one ` UNION ` / ` UNION ALL ` arm after the main query;
 arms render in call order:
 
-```rust,ignore
+```rust
 let arm = QueryBuilder::<Postgres>::table("b").select(["id"]);
 let (sql, _) = QueryBuilder::<Postgres>::table("a")
     .select(["id"])
@@ -77,7 +77,7 @@ and UNION arms render after it, the bind list is always
 **CTE bodies → main query → UNION arms**, and on Postgres the `$N` numbers
 follow the same sequence across all nesting:
 
-```rust,ignore
+```rust
 // THE CRUX: $1 (cte body) -> $2 (main where) -> $3 (union arm).
 let cte = QueryBuilder::<Postgres>::table("logs")
     .select(["n"])
@@ -109,7 +109,7 @@ Errors propagate through the same nesting: an invalid CTE body or UNION arm
 > dialect; only quoting and placeholders differ (see
 > [Dialect Differences](../dialects.md)):
 >
-> ```rust,ignore
+> ```rust
 > let cte = QueryBuilder::<MySql>::table("logs")
 >     .select(["n"])
 >     .where_gt("n", 1i64);

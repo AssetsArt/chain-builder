@@ -12,7 +12,7 @@ bind-count ceiling.
 
 ## `insert_many` + `on_conflict_merge`
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder};
 
 let rows = vec![
@@ -41,7 +41,7 @@ Two `insert_many` rules to keep in mind (full detail in
    binds `Value::Null` for that slot instead of panicking — a malformed
    record in an import batch cannot take the process down:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("u")
     .insert_many([vec![("a", 1i64), ("b", 2i64)], vec![("a", 3i64)]])
     .to_sql();
@@ -67,7 +67,7 @@ Exceed it and the statement fails at execute time. Stay comfortably under it
 by chunking — with the bonus that chunks keep statement size, lock duration,
 and memory per round trip bounded even when the hard limit is far away:
 
-```rust,no_run
+```rust
 use chain_builder::{Postgres, QueryBuilder};
 
 const COLS: usize = 2;          // ("email", "name")

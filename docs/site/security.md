@@ -17,7 +17,7 @@ path that interpolates a value into the SQL string. A malicious value can
 therefore never change the *shape* of the query — it travels to the database
 as data, in the driver's argument buffer.
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .where_eq("name", "'; DROP TABLE users; --")
@@ -47,7 +47,7 @@ site in the compiler routes through a single function, `ctx.esc`, which calls
 
 A breakout attempt stays trapped inside one (nonexistent) identifier:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select([r#"id" ; DROP TABLE users; --"#])
     .to_sql();
@@ -69,7 +69,7 @@ builder — the chain stays intact, `try_to_sql()` returns `Err`, `to_sql()`
 panics with the same message. See
 [Error Handling](error-handling.md) for the deferred-error mechanics.
 
-```rust,ignore
+```rust
 let err = QueryBuilder::<Postgres>::table("orders")
     .select(["user_id"])
     .having("amount", ">= 0 UNION SELECT password FROM users --", 0i64)
@@ -112,7 +112,7 @@ Never feed request input — even "just a column name" — into a raw fragment.
 If a raw fragment must vary at runtime, vary it by selecting between
 hard-coded fragments, and pass every value through `binds`:
 
-```rust,ignore
+```rust
 // OK: fragment is a compile-time literal, the value is bound.
 .having_raw("COUNT(*) > $1", vec![Value::I64(5)])
 
@@ -139,7 +139,7 @@ but it is still *used as an identifier*. A caller that passes
 columns they should not see, or trigger errors. Escaping neutralizes
 injection; it is not an authorization policy. Allowlist the names yourself:
 
-```rust,ignore
+```rust
 const SORTABLE: &[&str] = &["created_at", "name", "total"];
 
 let col = SORTABLE

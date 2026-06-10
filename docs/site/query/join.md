@@ -18,7 +18,7 @@ prefixes the join tables as well.
 | `full_outer_join(table, f)` | `FULL OUTER JOIN table ON …` |
 | `cross_join(table)` | `CROSS JOIN table` (no `ON`) |
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["users.id"])
     .join("orders", |j| j.on("orders.user_id", "=", "users.id"))
@@ -27,7 +27,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 // SELECT "users"."id" FROM "users" INNER JOIN "orders" ON "orders"."user_id" = "users"."id" LEFT JOIN "profiles" ON "profiles"."user_id" = "users"."id"
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("a")
     .select(["id"])
     .right_join("b", |j| j.on("b.a_id", "=", "a.id"))
@@ -38,7 +38,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("a")
 
 `cross_join` takes no closure — a cross join has no condition:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("a")
     .select(["id"])
     .cross_join("b")
@@ -62,7 +62,7 @@ conditions are joined with `AND`. There are three condition kinds:
 `on(col, op, col2)`: both sides are identifiers, escaped at compile time. The
 operator is a `&'static str`, so it cannot come from runtime input:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<MySql>::table("users")
     .select(["id"])
     .join("orders", |j| j.on("orders.user_id", "=", "users.id"))
@@ -76,7 +76,7 @@ let (sql, _) = QueryBuilder::<MySql>::table("users")
 placeholder + bind — the same discipline as [WHERE](where.md). Join binds are
 emitted **before** WHERE binds, because the `JOIN` clause renders first:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .join("orders", |j| {
@@ -102,7 +102,7 @@ API cannot express:
 > MySQL/SQLite use `?`. See the [Security Model](../security.md) for the full
 > escape-hatch inventory.
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("a")
     .select(["id"])
     .join("b", |j| {
@@ -124,7 +124,7 @@ A builder-level [`db("name")`](../cookbook/multi-tenant.md) qualifier prefixes
 the main table **and every join table** — the multi-tenant assumption is that
 all tables live in the same tenant database:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .db("mydb")
     .select(["users.id"])

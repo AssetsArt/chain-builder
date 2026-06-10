@@ -22,7 +22,7 @@ describes how the compiler consumes them.
 Compilation lives in `src/compile.rs`. One context struct is threaded through
 the entire walk:
 
-```rust,ignore
+```rust
 struct Ctx {
     sql: String,       // the SQL text, appended left to right
     binds: Vec<Value>, // bind values, pushed as their placeholder is written
@@ -45,7 +45,7 @@ emitted in a fixed order — CTE bodies first, then the SELECT list (including
 subquery columns), JOIN conditions, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT/OFFSET, then UNION
 arms — and the counter just keeps running across all of them:
 
-```rust,ignore
+```rust
 let recent = QueryBuilder::<Postgres>::table("logs")
     .select(["n"])
     .where_gt("n", 100i64);          // $1 — CTE body compiles first
@@ -73,7 +73,7 @@ the fragment, so it cannot renumber them.
 
 `Ctx` has one method for turning an identifier into SQL:
 
-```rust,ignore
+```rust
 fn esc(&self, ident: &str) -> String {
     escape_identifier(ident, self.quote)   // src/ident.rs
 }
@@ -95,7 +95,7 @@ break chaining. Misuse detected at *build* time (today: `having()` with a
 disallowed operator) is recorded on the builder, **first error wins**: a later
 mistake must not mask the one that points at the original misuse.
 
-```rust,ignore
+```rust
 // src/builder.rs — inside having():
 if self.error.is_none() {
     self.error = Some(BuildError::InvalidHavingOperator(op.to_owned()));
@@ -108,7 +108,7 @@ nested builders are compiled through the same function, an error recorded on
 a CTE body, UNION arm, or subquery propagates out of the parent compilation
 too:
 
-```rust,ignore
+```rust
 fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) -> Result<(), BuildError> {
     if let Some(e) = &qb.error {
         return Err(e.clone());
@@ -140,7 +140,7 @@ Two places need explicit work to get there:
   a key missing from a later row binds `Value::Null` (ragged rows are
   NULL-padded, never a panic).
 
-  ```rust,ignore
+  ```rust
   // INSERT INTO "users" ("age", "email", "name") VALUES ($1, $2, $3)
   // — always this column order, regardless of call order.
   ```

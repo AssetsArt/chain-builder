@@ -16,7 +16,7 @@ the unified `Error` so nothing in the handler can panic.
 
 ## The parameters
 
-```rust,ignore
+```rust
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -42,7 +42,7 @@ fn default_per_page() -> i64 { 20 }
 Build the *filtered* query once, then fork it (`QueryBuilder` is `Clone`) into
 the count query and the page query — the filters can never drift apart:
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder};
 
 fn list_query(p: &ListParams) -> QueryBuilder<Postgres> {
@@ -55,7 +55,7 @@ fn list_query(p: &ListParams) -> QueryBuilder<Postgres> {
 With `status = Some("active")` and `role = ["admin", "editor"]`, the page
 query compiles to:
 
-```rust,ignore
+```rust
 let per_page = p.per_page.clamp(1, 100); // never trust per_page from the wire
 let (sql, binds) = list_query(&p)
     .select(["id", "name", "role"])
@@ -82,7 +82,7 @@ Safety properties you get for free:
 
 ## The full axum handler
 
-```rust,ignore
+```rust
 use axum::{extract::{Query, State}, Json};
 use chain_builder::{Postgres, QueryBuilder};
 use serde::Serialize;

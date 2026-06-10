@@ -19,7 +19,7 @@ compiles to the native `ILIKE` operator; **MySQL** and **SQLite** have no
 `ILIKE`, so the builder lowers it to `LOWER(col) LIKE LOWER(?)` — same
 semantics, same chain:
 
-```rust,ignore
+```rust
 use chain_builder::{MySql, Postgres, QueryBuilder};
 
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
@@ -52,7 +52,7 @@ Escape the three metacharacters before splicing input into a pattern —
 backslash first, then `%` and `_` (order matters, or the backslashes
 produced for `%`/`_` get double-escaped). The crate ships exactly this:
 
-```rust,ignore
+```rust
 use chain_builder::escape_like; // in-crate since 3.1.0
 
 assert_eq!(escape_like("100%_a\\b"), "100\\%\\_a\\\\b");
@@ -67,7 +67,7 @@ The portable fix is an explicit `ESCAPE` clause, which the structured
 `where_like`/`where_ilike` do not model, so this is a legitimate
 [`where_raw`](../query/where.md) job:
 
-```rust,ignore
+```rust
 use chain_builder::{escape_like, Postgres, QueryBuilder, Value};
 
 let q = "50%"; // raw user input
@@ -102,7 +102,7 @@ If prefix search is enough (`ali` → "Alice", "Ali"), you can stay on the
 structured API. Escape the input, anchor it at the start, and skip the
 trailing-`%`-only worry:
 
-```rust,ignore
+```rust
 let q = "ali";
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select(["id", "name"])

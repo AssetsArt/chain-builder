@@ -21,7 +21,7 @@ inventory.
 
 ## A taste
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .where_eq("status", "active")

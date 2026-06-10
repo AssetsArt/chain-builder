@@ -49,7 +49,7 @@ runtime-built SQL strings, and it is sound here because the SQL is entirely
 the argument buffer, never in the string (see
 [Binds & Values](binds.md) and the [Security Model](security.md)).
 
-```rust,no_run
+```rust
 use chain_builder::{MySql, QueryBuilder};
 
 #[derive(sqlx::FromRow)]
@@ -76,7 +76,7 @@ aliases (alongside `SqlxDialect`):
 
 Useful when a helper function passes the query object around:
 
-```rust,ignore
+```rust
 use chain_builder::{QueryBuilder, SqlxDialect, SqlxQueryAs, BuildError};
 
 fn prepared<D: SqlxDialect, T>(qb: &QueryBuilder<D>) -> Result<SqlxQueryAs<'_, D, T>, BuildError>
@@ -135,7 +135,7 @@ A complete create-table → insert → fetch → count cycle against in-memory
 SQLite (adapted from the crate's live integration tests; requires
 `features = ["sqlx_sqlite"]`):
 
-```rust,no_run
+```rust
 use chain_builder::{IntoBind, QueryBuilder, Sqlite};
 
 #[derive(Debug, sqlx::FromRow, PartialEq)]

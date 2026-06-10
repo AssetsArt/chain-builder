@@ -11,7 +11,7 @@ table** with it, escaped per dialect. The rest of the chain is untouched.
 
 ## One pool, many schemas
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder};
 
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
@@ -25,7 +25,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 The qualifier applies to every statement kind, so the same tenant routing
 covers reads and writes:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .db("tenant_acme")
     .update([("name", "a")])
@@ -44,7 +44,7 @@ On MySQL the qualifier is a database name with backtick quoting
 `.db()` qualifies join tables too — the multi-tenant assumption is that all
 tables of a query live in the same tenant database:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .db("tenant_acme")
     .select(["users.id"])
@@ -63,7 +63,7 @@ rewritten; qualify them with the table name as usual
 Centralize the tenant decision in one constructor and the rest of your data
 layer never mentions tenancy again:
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder};
 
 struct Tenant {
@@ -93,7 +93,7 @@ raw user input like a host header or URL segment passed through verbatim.
 
 The builder does escape it. A hostile name cannot break out of the quoting:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("t")
     .db(r#"ev"il"#)
     .select(["x"])
@@ -107,7 +107,7 @@ sends `tenant_globex` instead of `tenant_acme` gets a perfectly valid,
 perfectly escaped query against **someone else's data**. Resolve the
 request's tenant claim against an allowlist you control:
 
-```rust,ignore
+```rust
 fn resolve_tenant(claim: &str) -> Option<&'static str> {
     // your registry: subdomain/JWT claim → schema name you created
     match claim {

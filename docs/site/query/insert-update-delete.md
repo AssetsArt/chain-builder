@@ -13,7 +13,7 @@ the next page: [Upsert & RETURNING](upsert-returning.md).
 `insert` takes any iterable of `(column, value)` pairs. Columns are sorted
 alphabetically before rendering; binds follow the sorted column order:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Sqlite>::table("users")
     .insert([("name", "John"), ("age", "30")])
     .to_sql();
@@ -29,7 +29,7 @@ tests.
 To mix value types in one row, pass `Value` directly (or call
 `.into_bind()`):
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Sqlite>::table("users")
     .insert([
         ("name", Value::Text("John".into())),
@@ -42,7 +42,7 @@ let (sql, binds) = QueryBuilder::<Sqlite>::table("users")
 
 `Option` binds NULL for `None` — handy for nullable columns:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Sqlite>::table("u")
     .insert([
         ("active", true.into_bind()),
@@ -58,7 +58,7 @@ let (sql, binds) = QueryBuilder::<Sqlite>::table("u")
 `insert_many` takes an iterator of rows, each itself a sequence of
 `(column, value)` pairs. It renders one `(…)` tuple per row:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("u")
     .insert_many([[("a", 1i64), ("b", 2i64)], [("a", 3i64), ("b", 4i64)]])
     .to_sql();
@@ -75,7 +75,7 @@ Two rules govern the column set:
    missing from that row. A malformed later row can therefore never panic
    your handler (DoS-safe by design):
 
-```rust,ignore
+```rust
 // Second row missing "b" → that slot binds Null.
 let (sql, binds) = QueryBuilder::<Postgres>::table("u")
     .insert_many([vec![("a", 1i64), ("b", 2i64)], vec![("a", 3i64)]])
@@ -90,7 +90,7 @@ the first row defines the schema of the statement.
 `insert_many` composes with `on_conflict_*` and `returning` exactly like
 single-row `insert`:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("u")
     .insert_many([[("a", 1i64), ("b", 2i64)], [("a", 3i64), ("b", 4i64)]])
     .on_conflict_do_nothing(["a"])
@@ -108,7 +108,7 @@ guidance.
 and renders a `SET` list. The full [WHERE](where.md) API still applies — its
 binds come **after** the SET binds, because `SET` renders first:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .update([("age", 31i64)])
     .where_eq("id", 1i64)
@@ -117,7 +117,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 // binds == [Value::I64(31), Value::I64(1)]
 ```
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .update([("name", Value::Text("a".into())), ("age", Value::I64(2))])
     .where_eq("id", 1i64)
@@ -132,7 +132,7 @@ Plain `update()` can only bind values (`SET "col" = $1`). Three companions
 cover computed assignments (3.1.0+). All three switch the builder to UPDATE,
 so `increment` alone is a valid statement:
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder, Value};
 
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
@@ -156,7 +156,7 @@ preceding `increment`/`decrement` counts as one bind); on MySQL/SQLite use
 
 `delete` takes no arguments; WHERE applies as usual:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Sqlite>::table("users")
     .delete()
     .where_eq("id", 1i64)
@@ -169,7 +169,7 @@ A `delete()` **without** WHERE compiles happily — to a statement that deletes
 every row. The builder does not second-guess you here; if that is not what
 you meant, the bug is yours:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Sqlite>::table("users").delete().to_sql();
 // DELETE FROM "users"
 ```
@@ -189,7 +189,7 @@ valid SQL, so the compiler refuses to render it:
 As always, [`try_to_sql()`](../error-handling.md) returns the error and
 `to_sql()` panics with the same message:
 
-```rust,ignore
+```rust
 let err = QueryBuilder::<Postgres>::table("users")
     .insert(std::iter::empty::<(&str, Value)>())
     .try_to_sql()

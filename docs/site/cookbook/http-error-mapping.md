@@ -25,7 +25,7 @@ refined to **404** where "no such row" is an expected outcome.
 One newtype over `chain_builder::Error`, one `From` impl so `?` works in
 every handler, one `IntoResponse` impl holding the whole mapping:
 
-```rust,ignore
+```rust
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -109,7 +109,7 @@ impl IntoResponse for AppError {
 
 A handler then needs no error code at all:
 
-```rust,ignore
+```rust
 async fn get_user(
     State(pool): State<sqlx::PgPool>,
     Path(id): Path<i64>,

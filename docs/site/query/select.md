@@ -13,7 +13,7 @@ aggregates, raw expressions, subquery columns, and `DISTINCT` /
 Every name is escaped per dialect; dotted identifiers are escaped per segment;
 a literal `"*"` passes through unquoted; an empty list selects `*`:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id", "name"])
     .where_eq("status", "active")
@@ -21,7 +21,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 // SELECT "id", "name" FROM "users" WHERE "status" = $1
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select(["users.id"])
     .to_sql();
@@ -31,7 +31,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 Escaping is not optional decoration — a hostile column name is neutralized by
 quote-doubling rather than spliced in:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select([r#"id" ; DROP TABLE users; --"#])
     .to_sql();
@@ -43,7 +43,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 `select_as(col, alias)` emits `col AS alias`, with **both** identifiers
 escaped:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select_as("created_at", "joined")
     .to_sql();
@@ -57,14 +57,14 @@ Five aggregate helpers — `select_count`, `select_sum`, `select_avg`,
 alias. The column is escaped; for `select_count` (and `select_count_as`) the
 special column `"*"` passes through as `COUNT(*)`:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select_count("*")
     .to_sql();
 // SELECT COUNT(*) FROM "users"
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("orders")
     .select_sum("amount")
     .select_avg("amount")
@@ -77,7 +77,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("orders")
 Aggregates mix freely with plain columns and `GROUP BY` (see
 [GROUP BY · HAVING · ORDER · LIMIT](group-having-order-limit.md)):
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("orders")
     .select(["status"])
     .select_count_as("*", "cnt")
@@ -108,7 +108,7 @@ accumulate; `binds` is an `Option<Vec<Value>>` (`None` for no binds).
 > to every `*_raw` method — see the [Security Model](../security.md) for the
 > full escape-hatch inventory.
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("orders")
     .select_raw("COUNT(*)", None)
     .to_sql();
@@ -123,7 +123,7 @@ expressions. The subquery is compiled with **placeholder continuity**: since
 the SELECT list renders before `WHERE`, the subquery's binds take the earlier
 `$N` numbers — automatically, no manual numbering involved:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .select_subquery(
@@ -145,7 +145,7 @@ see [WHERE](where.md).
 
 `distinct()` emits `SELECT DISTINCT …` and works on all dialects:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("t")
     .distinct()
     .select(["a"])
@@ -158,7 +158,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("t")
 `distinct_on(cols)` emits Postgres' `SELECT DISTINCT ON (cols) …`; the columns
 are escaped like any identifier:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("t")
     .distinct_on(["a", "b"])
     .select(["a"])

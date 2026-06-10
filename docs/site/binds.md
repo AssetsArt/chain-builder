@@ -8,7 +8,7 @@ placeholders (`$N` on Postgres, `?` on MySQL/SQLite), and `binds` is a
 dialect-agnostic representation of a bound parameter — and `IntoBind`, the
 trait that converts ordinary Rust types into it.
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder, Value};
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
@@ -27,7 +27,7 @@ separation is the core SQL-injection guarantee (see the
 
 ## The `Value` enum
 
-```rust,ignore
+```rust
 #[non_exhaustive]
 pub enum Value {
     Null,
@@ -84,7 +84,7 @@ type. For `i8`–`i64` and `u8`–`u32` this is lossless.
 > The narrowing uses Rust's `as i64` truncation semantics — silent
 > two's-complement wrap, not an error and not saturation:
 >
-> ```rust,ignore
+> ```rust
 > use chain_builder::{IntoBind, Value};
 > assert_eq!(((i64::MAX as u64) + 1).into_bind(), Value::I64(i64::MIN));
 > assert_eq!(u64::MAX.into_bind(), Value::I64(-1));
@@ -100,7 +100,7 @@ type. For `i8`–`i64` and `u8`–`u32` this is lossless.
 
 `None` binds SQL `NULL`; `Some(v)` binds exactly what `v` alone would:
 
-```rust,ignore
+```rust
 use chain_builder::{IntoBind, Value};
 assert_eq!(Option::<i64>::None.into_bind(), Value::Null);
 assert_eq!(Some(5i64).into_bind(), Value::I64(5));
@@ -119,7 +119,7 @@ with [`when`](query/dynamic.md).
 explicitly whenever you need to override the blanket conversions (e.g. the
 `u64` case above):
 
-```rust,ignore
+```rust
 assert_eq!(Value::I64(1).into_bind(), Value::I64(1));
 ```
 
@@ -140,7 +140,7 @@ explicit `::jsonb` cast in raw SQL. For jsonb *querying* see
 
 ### `uuid` — `uuid::Uuid`
 
-```rust,ignore
+```rust
 let id = uuid::Uuid::nil();
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .select(["id"])
@@ -159,7 +159,7 @@ Four variants, one per chrono type: `DateTimeUtc`
 (`chrono::DateTime<chrono::Utc>` — timezone-aware, UTC), `NaiveDateTime`,
 `NaiveDate`, `NaiveTime`:
 
-```rust,ignore
+```rust
 let nd = chrono::NaiveDate::from_ymd_opt(2026, 6, 9).unwrap();
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .select(["id"])
@@ -173,7 +173,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
 
 For money and exact-numeric columns:
 
-```rust,ignore
+```rust
 use rust_decimal::Decimal;
 use std::str::FromStr;
 
@@ -203,7 +203,7 @@ For logs and debugging, `to_sql_pretty()` (3.1.0+) renders the SQL plus one
 line per bind. `try_to_sql_pretty()` is the fallible twin and surfaces the
 same `BuildError` as `try_to_sql()`:
 
-```rust,ignore
+```rust
 let qb = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .where_eq("status", "active")

@@ -43,7 +43,7 @@ cargo test --all-features
 Then: `git push origin <branch>` and `gh pr create --base main --head <branch> …`.
 
 > Note: the repo HAS PR CI — `ci.yml` (fmt + clippy + build + test) runs on
-> push and PR, and `docs.yml` builds the mdBook on PR. `publish.yml` only runs
+> push and PR, and `docs.yml` builds the VitePress site on PR. `publish.yml` only runs
 > on tags. The local pre-flight catches problems before you burn CI cycles.
 
 ## 3. Wait for checks — GREEN before merge

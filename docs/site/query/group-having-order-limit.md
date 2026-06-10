@@ -12,7 +12,7 @@ order: `… WHERE … GROUP BY … HAVING … ORDER BY … LIMIT … OFFSET …`
 `group_by(cols)` takes any iterable of column names; calls accumulate. Every
 name is escaped per dialect, dotted identifiers per segment:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .group_by(["a", "b"])
@@ -20,7 +20,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 // SELECT "id" FROM "users" GROUP BY "a", "b"
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .group_by(["t.col"])
@@ -31,7 +31,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 The typical pairing is with the aggregate selectors from
 [SELECT](select.md):
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("orders")
     .select(["status"])
     .select_count_as("*", "cnt")
@@ -50,7 +50,7 @@ structured columns are present it becomes the whole clause. Repeated
 `group_by_raw`/`order_by_raw` calls replace the previous fragment (unlike the
 accumulating structured methods):
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .select(["a"])
     .group_by_raw("date_trunc('day', created_at)", vec![])
@@ -58,7 +58,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
 // SELECT "a" FROM "t" GROUP BY date_trunc('day', created_at)
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("t")
     .select(["a"])
     .group_by(["a"])
@@ -84,7 +84,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("t")
 alias (escaped), `val` is bound. Multiple `having` terms are joined with
 `AND`:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("orders")
     .select(["user_id"])
     .group_by(["user_id"])
@@ -107,7 +107,7 @@ vector. So `op` is validated against a fixed allowlist:
 Matching is **case-insensitive** and the operator is stored **trimmed** —
 `"  like  "` is accepted and rendered as `like`:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("orders")
     .select(["user_id"])
     .having("name", "  like  ", "a%")
@@ -122,7 +122,7 @@ chain stays intact, and the error surfaces at compile time:
 panics with the same message. If several deferred errors occur, the **first
 one wins** (it points at the original misuse):
 
-```rust,ignore
+```rust
 let qb = QueryBuilder::<Postgres>::table("orders")
     .select(["user_id"])
     .having("amount", "; DROP TABLE users", 0i64);
@@ -141,7 +141,7 @@ The allowlisted `having` covers `col op value` only. For aggregate
 expressions like `COUNT(*) > ?` — or any operator outside the allowlist —
 use `having_raw(sql, binds)`, the documented verbatim escape hatch:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("orders")
     .select(["user_id"])
     .group_by(["user_id"])
@@ -157,7 +157,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("orders")
 > by earlier clauses (SELECT-list subqueries, WHERE values, …) and number
 > from there. With one preceding WHERE bind the aggregate bind is `$2`:
 >
-> ```rust,ignore
+> ```rust
 > let (sql, binds) = QueryBuilder::<Postgres>::table("orders")
 >     .select(["user_id"])
 >     .where_eq("status", "paid")
@@ -175,7 +175,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("orders")
 `order_by_asc` and `order_by_desc` are shorthands. Calls accumulate into one
 comma-separated clause; columns are escaped:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .order_by_asc("a")
@@ -184,7 +184,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 // SELECT "id" FROM "users" ORDER BY "a" ASC, "b" DESC
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .order_by("a", Order::Asc)
@@ -199,7 +199,7 @@ Same shape and same placeholder contract as `group_by_raw`: the fragment is
 appended after any structured `order_by` terms, or becomes the whole clause
 on its own:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .select(["a"])
     .order_by_raw("CASE WHEN a = $1 THEN 0 ELSE 1 END", vec![Value::I64(5)])
@@ -213,7 +213,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
 `limit(n)` and `offset(n)` render `LIMIT` / `OFFSET` with **bound
 placeholders** — the numbers travel as binds, not as literal SQL text:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .where_eq("status", "active")
@@ -232,7 +232,7 @@ without a `limit` fails with `BuildError::OffsetWithoutLimit` —
 [`try_to_sql()`](../error-handling.md) returns it as `Err`, `to_sql()` panics
 with `offset(...) requires limit(...)`:
 
-```rust,ignore
+```rust
 let err = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .offset(10)
@@ -250,7 +250,7 @@ let err = QueryBuilder::<Postgres>::table("users")
 `page < 1` is treated as page 1 (offset 0), so callers never get a negative
 offset:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .paginate(2, 10)
@@ -267,7 +267,7 @@ This is the natural endpoint of a request-driven chain — see
 > SQLite apart from quoting and placeholders
 > (see [Dialect Differences](../dialects.md)):
 >
-> ```rust,ignore
+> ```rust
 > let (sql, binds) = QueryBuilder::<MySql>::table("users")
 >     .select(["id"])
 >     .where_eq("status", "active")

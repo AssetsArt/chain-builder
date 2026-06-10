@@ -33,7 +33,7 @@ family whenever any part of the query is **shaped by runtime input** (filter
 parameters, pagination, user-selected operators): there, an invalid builder is
 a request problem, not a crash-worthy bug.
 
-```rust,ignore
+```rust
 use chain_builder::{BuildError, Postgres, QueryBuilder};
 
 // offset() without limit() is invalid — try_to_sql returns the typed error:
@@ -82,7 +82,7 @@ disallowed operator does **not** panic at the call site — `having()` returns
 is **recorded on the builder** (the first recorded error wins if several
 calls fail) and surfaces when you compile:
 
-```rust,ignore
+```rust
 use chain_builder::{BuildError, Postgres, QueryBuilder};
 
 let qb = QueryBuilder::<Postgres>::table("orders")
@@ -102,7 +102,7 @@ builder is attached as a [CTE](query/cte-union.md), a
 `where_exists`, `where_in_subquery`, …), compiling the *outer* builder
 surfaces the inner error:
 
-```rust,ignore
+```rust
 let bad_inner = QueryBuilder::<Postgres>::table("orders")
     .select(["user_id"])
     .having("amount", "UNION SELECT", 0i64);
@@ -122,7 +122,7 @@ The execution helpers ([`fetch_all`/`fetch_one`/`fetch_optional`/`execute`/
 ways: the query failed to **build**, or it failed to **execute**. Both fold
 into one enum:
 
-```rust,ignore
+```rust
 #[non_exhaustive]
 pub enum Error {
     Build(BuildError),  // invalid construction — returned BEFORE touching the DB
@@ -138,7 +138,7 @@ pub enum Error {
   `BuildError` or `sqlx::Error`, so it composes with `anyhow`, `thiserror`,
   and error-report chains.
 
-```rust,ignore
+```rust
 use chain_builder::{BuildError, Error};
 
 let e = Error::from(BuildError::OffsetWithoutLimit);
@@ -156,7 +156,7 @@ compiler therefore *requires* a wildcard arm in every `match` over them —
 write your matches so a new variant lands somewhere sensible (usually the
 500 bucket):
 
-```rust,ignore
+```rust
 match qb.try_to_sql() {
     Ok((sql, binds)) => { /* run it */ }
     Err(BuildError::InvalidHavingOperator(op)) => { /* reject the input */ }
@@ -171,7 +171,7 @@ one question: *did the offending value come from the request?* Variants an
 end-user can trigger (an operator or pagination parameter taken from input)
 map to **400**; the rest are programmer errors and database failures — **500**:
 
-```rust,ignore
+```rust
 use chain_builder::{BuildError, Error};
 
 match qb.fetch_all::<Row, _>(&pool).await {

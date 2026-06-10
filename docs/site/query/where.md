@@ -15,7 +15,7 @@ predicate method, the empty-`IN` semantics, the dialect-aware ones
 `col = ?`, `col != ?`, `col > ?`, `col >= ?`, `col < ?`, `col <= ?`
 respectively. `where_like` emits `col LIKE ?`:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .where_ne("a", 1i64)
     .where_gte("b", 2i64)
@@ -36,7 +36,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
 
 Take any iterable of bindable values and emit one placeholder per element:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id", "name"])
     .where_eq("status", "active")
@@ -52,7 +52,7 @@ a constant predicate with the logically correct truth value:
 - empty `where_in` → `1 = 0` (nothing matches — no value is in an empty set)
 - empty `where_not_in` → `1 = 1` (everything matches)
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .where_in("x", Vec::<i64>::new())
     .to_sql();
@@ -71,7 +71,7 @@ without special-casing the empty list.
 
 Emit `col IS NULL` / `col IS NOT NULL` — no binds:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .where_null("a")
     .where_not_null("b")
@@ -84,7 +84,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
 
 `where_between(col, lo, hi)` emits `col BETWEEN ? AND ?` with two binds:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .where_between("age", 18i64, 65i64)
     .to_sql();
@@ -97,7 +97,7 @@ On **Postgres** this compiles to the native `ILIKE` operator. **MySQL** and
 **SQLite** have no `ILIKE`, so the builder lowers it to
 `LOWER(col) LIKE LOWER(?)` — same semantics, portable chain:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .select(["a"])
     .where_ilike("name", "%jo%")
@@ -105,7 +105,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
 // SELECT "a" FROM "t" WHERE "name" ILIKE $1
 ```
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<MySql>::table("t")
     .select(["a"])
     .where_ilike("name", "%jo%")
@@ -122,7 +122,7 @@ The `where_like` wildcard caveat applies here too — see
 JSON text string (or `Value::Json` behind the `json` feature — see
 [Binds & Values](../binds.md)):
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .select(["a"])
     .where_jsonb_contains("meta", "{\"a\":1}")
@@ -140,7 +140,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
 `where_column(lhs, op, rhs)` compares two columns (both escaped, no bind).
 `op` is a `&'static str`, so the operator cannot be built from runtime input:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .select(["x"])
     .where_column("a.x", "=", "b.y")
@@ -157,7 +157,7 @@ Its main job is correlating subqueries with the outer query (next section).
 subquery is compiled with **placeholder continuity** — its binds continue the
 outer query's `$N` numbering at the point the predicate is emitted:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .where_eq("active", true)
@@ -171,7 +171,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 // SELECT "id" FROM "users" WHERE "active" = $1 AND EXISTS (SELECT "1" FROM "orders" WHERE "orders"."user_id" = "users"."id" AND "total" > $2)
 ```
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .where_in_subquery(
@@ -197,7 +197,7 @@ group attaches to what precedes it (`AND (…)` vs `OR (…)`); inside the group
 predicates are joined with `AND` unless they are themselves `or_where`
 sub-groups:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .where_eq("active", true)
     .or_where(|w| w.where_eq("role", "admin").where_gt("age", 40i64))
@@ -207,7 +207,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 
 Nesting — an `or_where` inside an `and_where` group attaches with `OR`:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .select(["*"])
     .and_where(|g| g.where_eq("a", 1i64).or_where(|h| h.where_eq("b", 2i64)))
@@ -218,7 +218,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
 Since 3.1.0 the four subquery predicates are also available **inside**
 groups, with the same contracts (placeholder continuity included):
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .and_where(|g| {
@@ -247,7 +247,7 @@ Two edge cases are handled for you:
   (common with conditional chains) produces no `()`, no dangling `AND`/`OR` —
   and if the empty group was the only predicate, no `WHERE` at all:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .where_eq("a", 1i64)
     .and_where(|w| w)
@@ -277,7 +277,7 @@ operators and expressions the structured API does not model:
 > use `?`. A wrong `$N` produces a malformed query. Never build the fragment
 > itself from untrusted input — see the [Security Model](../security.md).
 
-```rust,ignore
+```rust
 // Seven binds precede the raw predicate (a, b, c, d, e, and h's two BETWEEN
 // bounds), so its single bind is the 8th → `$8`.
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")

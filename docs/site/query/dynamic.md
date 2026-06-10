@@ -12,7 +12,7 @@ into SQL without ever concatenating strings.
 
 Returns `f(self)` when `cond` is true, otherwise `self` unchanged:
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder};
 let only_active = true;
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
@@ -24,7 +24,7 @@ assert_eq!(sql, r#"SELECT "id" FROM "users" WHERE "status" = $1"#);
 
 When the condition is false, nothing is added — no `WHERE` keyword, no bind:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .when(false, |q| q.where_eq("a", 1i64))
@@ -37,7 +37,7 @@ The closure receives the whole builder, so it can add anything — extra
 predicates, joins, ordering — and the rest of the chain continues unaffected.
 Bind numbering stays correct in both branches:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
     .where_eq("status", "active")
@@ -58,7 +58,7 @@ With `false`, the same chain compiles to
 Applies `if_true` when `cond` holds, otherwise `if_false` — an inline
 `if/else` for the chain:
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder};
 let active = false;
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
@@ -85,7 +85,7 @@ gives `None` its intended meaning ("no filter"). Without it,
 `"status" = $1`, which never matches any row (use
 [`where_null`](where.md) for explicit NULL tests):
 
-```rust,ignore
+```rust
 struct Filters {
     status: Option<String>,
     min_age: Option<i64>,
@@ -123,7 +123,7 @@ the `where_like` wildcard caveat is covered in [WHERE](where.md).
 it. The standard pagination pair — one COUNT, one page fetch — from a single
 source of truth for the filters:
 
-```rust,ignore
+```rust
 let base = QueryBuilder::<Postgres>::table("users")
     .where_eq("status", "active");
 
@@ -149,7 +149,7 @@ builder in `SELECT COUNT(*)` for you.)
 **1-based** page window. Both numbers are bound as placeholders, never
 inlined:
 
-```rust,ignore
+```rust
 use chain_builder::{Postgres, QueryBuilder, Value};
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     .select(["id"])
@@ -162,7 +162,7 @@ assert_eq!(binds, vec![Value::I64(10), Value::I64(10)]);
 `page < 1` is clamped to page 1, so hostile or buggy input can never produce
 a negative offset:
 
-```rust,ignore
+```rust
 let (_, binds) = QueryBuilder::<Postgres>::table("users")
     .paginate(0, 10)   // also -5, -100, …
     .to_sql();

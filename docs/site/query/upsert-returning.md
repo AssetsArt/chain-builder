@@ -16,7 +16,7 @@ on MySQL**.
 **Postgres / SQLite** render `ON CONFLICT (…) DO NOTHING` — or bare
 `ON CONFLICT DO NOTHING` when `targets` is empty:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .insert([("id", 1i64), ("email", 0), ("name", 0)])
     .on_conflict_do_nothing(["id"])
@@ -24,7 +24,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 // INSERT INTO "users" ("email", "id", "name") VALUES ($1, $2, $3) ON CONFLICT ("id") DO NOTHING
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .insert([("id", 1i64), ("name", 0)])
     .on_conflict_do_nothing(Vec::<&str>::new())
@@ -34,7 +34,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 
 SQLite is identical apart from `?` placeholders:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Sqlite>::table("users")
     .insert([("id", 1i64), ("email", 0), ("name", 0)])
     .on_conflict_do_nothing(["id"])
@@ -45,7 +45,7 @@ let (sql, _) = QueryBuilder::<Sqlite>::table("users")
 **MySQL** has no `ON CONFLICT`; `DoNothing` becomes the `INSERT IGNORE INTO`
 keyword with no trailing clause:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<MySql>::table("users")
     .insert([("id", 1i64), ("email", 0), ("name", 0)])
     .on_conflict_do_nothing(["id"])
@@ -67,7 +67,7 @@ On conflict, update the existing row from the values the `INSERT` proposed.
 list is **the inserted columns minus the conflict targets** (you don't
 re-assign the key you matched on):
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .insert([("id", 1i64), ("email", 0), ("name", 0)]) // values irrelevant for SQL shape
     .on_conflict_merge(["id"])
@@ -75,7 +75,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 // INSERT INTO "users" ("email", "id", "name") VALUES ($1, $2, $3) ON CONFLICT ("id") DO UPDATE SET "email" = EXCLUDED."email", "name" = EXCLUDED."name"
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Sqlite>::table("users")
     .insert([("id", 1i64), ("email", 0), ("name", 0)])
     .on_conflict_merge(["id"])
@@ -88,7 +88,7 @@ SET list is invalid SQL. So when `targets` is empty, or the targets cover
 **all** inserted columns (nothing left to set), the merge **falls back to the
 `DO NOTHING` rendering**:
 
-```rust,ignore
+```rust
 // Targets cover every inserted column → nothing to merge.
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .insert([("id", 1i64)])
@@ -97,7 +97,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 // INSERT INTO "users" ("id") VALUES ($1) ON CONFLICT ("id") DO NOTHING
 ```
 
-```rust,ignore
+```rust
 // Empty targets → bare DO NOTHING.
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .insert([("id", 1i64), ("name", 0)])
@@ -115,7 +115,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 > fire. The SET list is also different: it covers **ALL inserted columns**,
 > not "inserted minus targets".
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<MySql>::table("users")
     .insert([("id", 1i64), ("email", 0), ("name", 0)])
     .on_conflict_merge(["id"]) // "id" target: IGNORED on MySQL
@@ -136,7 +136,7 @@ for you.
 DELETE. Columns are escaped; the special column `"*"` is emitted
 **unescaped** (`RETURNING *`):
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .insert([("name", "x")])
     .returning(["id"])
@@ -144,7 +144,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 // INSERT INTO "users" ("name") VALUES ($1) RETURNING "id"
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .insert([("name", "x")])
     .returning(["*"])
@@ -152,7 +152,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 // INSERT INTO "users" ("name") VALUES ($1) RETURNING *
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .update([("name", "x")])
     .where_eq("id", 1i64)
@@ -161,7 +161,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 // UPDATE "users" SET "name" = $1 WHERE "id" = $2 RETURNING "id"
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("users")
     .delete()
     .where_eq("id", 1i64)
@@ -175,7 +175,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 > that expects rows back from an insert must fetch them separately on MySQL
 > (e.g. via `last_insert_id`):
 >
-> ```rust,ignore
+> ```rust
 > let (sql, _) = QueryBuilder::<MySql>::table("users")
 >     .insert([("name", "x")])
 >     .returning(["id"])
@@ -187,7 +187,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("users")
 > dialect support flag is compile-time, not a runtime version check — on an
 > older SQLite the statement fails at execution time.
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Sqlite>::table("users")
     .insert([("name", "x")])
     .returning(["id"])

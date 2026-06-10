@@ -17,7 +17,7 @@ locking dialect, is a [`BuildError`](../error-handling.md), not a silent drop.
 update or delete them). The clause renders after everything else, including
 `LIMIT`:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
     .select(["id"])
     .where_eq("status", "queued")
@@ -26,7 +26,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
 // SELECT "id" FROM "jobs" WHERE "status" = $1 FOR UPDATE
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
     .select(["id"])
     .for_share()
@@ -46,7 +46,7 @@ Two modifiers change that:
   (` SKIP LOCKED`),
 - `no_wait()` — error immediately if any row is already locked (` NOWAIT`).
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
     .select(["id"])
     .for_update()
@@ -55,7 +55,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
 // SELECT "id" FROM "jobs" FOR UPDATE SKIP LOCKED
 ```
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
     .select(["id"])
     .for_update()
@@ -67,7 +67,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
 If no lock strength was set yet, both modifiers default it to `FOR UPDATE` —
 the job-queue idiom in one call:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
     .select(["id"])
     .skip_locked()
@@ -78,7 +78,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
 An existing `for_share()` is preserved — the modifier never downgrades or
 upgrades a strength you chose explicitly:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
     .select(["id"])
     .for_share()
@@ -89,7 +89,7 @@ let (sql, _) = QueryBuilder::<Postgres>::table("jobs")
 
 The lock clause renders last, after `LIMIT`/`OFFSET`:
 
-```rust,ignore
+```rust
 let (sql, binds) = QueryBuilder::<Postgres>::table("jobs")
     .select(["id"])
     .limit(1)
@@ -113,7 +113,7 @@ happen:
   dialect-independent — it fires on SQLite too, because the misuse is
   structural, not a dialect capability.
 
-  ```rust,ignore
+  ```rust
   let err = QueryBuilder::<Postgres>::table("users")
       .update([("status", "x")])
       .for_update()
@@ -129,7 +129,7 @@ happen:
   `to_sql()` panics with
   `for_update()/for_share() cannot be combined with UNION`.
 
-  ```rust,ignore
+  ```rust
   let err = QueryBuilder::<Postgres>::table("a")
       .select(["id"])
       .union(QueryBuilder::<Postgres>::table("b").select(["id"]))
@@ -146,7 +146,7 @@ happen:
 > Rather than emit invalid SQL, the compiler silently drops the entire lock
 > clause (strength and modifier) on SQLite:
 >
-> ```rust,ignore
+> ```rust
 > let (sql, _) = QueryBuilder::<Sqlite>::table("jobs")
 >     .select(["id"])
 >     .for_update()
@@ -158,7 +158,7 @@ happen:
 > Because the lock is dropped before the UNION check runs, lock + `UNION` on
 > SQLite is also a harmless no-op rather than a `LockWithUnion` error:
 >
-> ```rust,ignore
+> ```rust
 > let arm = QueryBuilder::<Sqlite>::table("archived_jobs").select(["id"]);
 > let (sql, _) = QueryBuilder::<Sqlite>::table("jobs")
 >     .select(["id"])
@@ -172,7 +172,7 @@ happen:
 
 MySQL renders the same clauses with its own quoting:
 
-```rust,ignore
+```rust
 let (sql, _) = QueryBuilder::<MySql>::table("jobs")
     .select(["id"])
     .for_update()
@@ -187,7 +187,7 @@ The canonical pattern is `SELECT … FOR UPDATE SKIP LOCKED` inside a
 transaction: each worker claims a different row, already-claimed rows are
 skipped, and the lock is released at commit:
 
-```rust,no_run
+```rust
 use chain_builder::{Postgres, QueryBuilder};
 
 async fn claim_next_job(pool: &sqlx::PgPool) -> Result<(), chain_builder::Error> {

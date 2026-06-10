@@ -46,7 +46,7 @@ See [Binds & Values](binds.md) for the full type-mapping table.
 A builder is created with `QueryBuilder::<Dialect>::table(...)`, configured by
 chaining methods, and turned into SQL with `to_sql()`:
 
-```rust,ignore
+```rust
 use chain_builder::{QueryBuilder, Postgres};
 
 let (sql, binds) = QueryBuilder::<Postgres>::table("users")
@@ -90,8 +90,7 @@ You rarely need to touch the `(sql, binds)` pair yourself: with the matching
 `sqlx_*` feature enabled, the builder hands off directly to
 [sqlx](https://github.com/launchbadge/sqlx):
 
-```rust,no_run
-# async fn demo(pool: sqlx::PgPool) -> Result<(), chain_builder::Error> {
+```rust
 use chain_builder::{QueryBuilder, Postgres};
 
 #[derive(sqlx::FromRow)]
@@ -102,7 +101,6 @@ let users: Vec<User> = QueryBuilder::<Postgres>::table("users")
     .where_eq("status", "active")
     .fetch_all(&pool)
     .await?;
-# Ok(()) }
 ```
 
 `fetch_all`, `fetch_one`, `fetch_optional`, `execute`, `count`, scalar
