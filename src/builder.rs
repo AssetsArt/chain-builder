@@ -6,8 +6,9 @@
 
 use core::marker::PhantomData;
 
-use crate::compile::compile;
+use crate::compile::{compile, try_compile};
 use crate::dialect::Dialect;
+use crate::error::BuildError;
 use crate::value::{IntoBind, Value};
 use crate::where_::{Conj, Predicate, WhereBuilder};
 
@@ -323,6 +324,10 @@ pub struct QueryBuilder<D: Dialect> {
     pub(crate) returning: Vec<String>,
     /// Row-locking clause (`FOR UPDATE`/`FOR SHARE`); SELECT-only, no-op on SQLite.
     pub(crate) lock: Option<Lock>,
+    /// First misuse detected by a builder method (e.g. a disallowed `having()`
+    /// operator). Deferred instead of panicking mid-chain; surfaced by
+    /// [`Self::try_to_sql`] as `Err` (and by [`Self::to_sql`] as a panic).
+    pub(crate) error: Option<BuildError>,
     _marker: PhantomData<D>,
 }
 
@@ -355,6 +360,7 @@ impl<D: Dialect> QueryBuilder<D> {
             on_conflict: None,
             returning: Vec::new(),
             lock: None,
+            error: None,
             _marker: PhantomData,
         }
     }
@@ -1042,11 +1048,14 @@ impl<D: Dialect> QueryBuilder<D> {
     /// **verbatim** into the SQL (it is not a bound value and cannot be escaped
     /// without changing its meaning), an attacker-controlled operator would be a
     /// SQL-injection vector. To prevent that, `op` is validated against a fixed
-    /// set of comparison operators and a disallowed operator **panics**
-    /// (fail-loud, like the `offset`/`distinct_on`/lock guards). The operator is
-    /// matched case-insensitively and stored trimmed. For anything outside this
-    /// set — arbitrary aggregate expressions, custom operators — use
-    /// [`Self::having_raw`], the documented verbatim escape hatch.
+    /// set of comparison operators. A disallowed operator records a deferred
+    /// [`BuildError::InvalidHavingOperator`] (the chain stays intact):
+    /// [`Self::try_to_sql`] returns it as `Err`, while [`Self::to_sql`] panics
+    /// with the same message (fail-loud, like the `offset`/`distinct_on`/lock
+    /// guards). The operator is matched case-insensitively and stored trimmed.
+    /// For anything outside this set — arbitrary aggregate expressions, custom
+    /// operators — use [`Self::having_raw`], the documented verbatim escape
+    /// hatch.
     ///
     /// Allowed: `=`, `!=`, `<>`, `>`, `>=`, `<`, `<=`, `LIKE`, `NOT LIKE`.
     pub fn having(mut self, col: &str, op: &str, val: impl IntoBind) -> Self {
@@ -1057,10 +1066,12 @@ impl<D: Dialect> QueryBuilder<D> {
             .iter()
             .any(|allowed| allowed.eq_ignore_ascii_case(normalized))
         {
-            panic!(
-                "having() operator {op:?} is not an allowed comparison operator \
-                 (use having_raw() for arbitrary aggregate expressions)"
-            );
+            // Keep the FIRST error: it points at the original misuse, and a
+            // later mistake must not mask it.
+            if self.error.is_none() {
+                self.error = Some(BuildError::InvalidHavingOperator(op.to_owned()));
+            }
+            return self;
         }
         self.havings.push(Having::Col {
             col: col.to_owned(),
@@ -1132,15 +1143,13 @@ impl<D: Dialect> QueryBuilder<D> {
     /// by-value chain.
     ///
     /// ```
-    /// # #[cfg(feature = "v2")] {
-    /// use chain_builder::v2::{Postgres, QueryBuilder};
+    /// use chain_builder::{Postgres, QueryBuilder};
     /// let only_active = true;
     /// let (sql, _) = QueryBuilder::<Postgres>::table("users")
     ///     .select(["id"])
     ///     .when(only_active, |q| q.where_eq("status", "active"))
     ///     .to_sql();
     /// assert_eq!(sql, r#"SELECT "id" FROM "users" WHERE "status" = $1"#);
-    /// # }
     /// ```
     pub fn when(self, cond: bool, f: impl FnOnce(Self) -> Self) -> Self {
         if cond {
@@ -1154,8 +1163,7 @@ impl<D: Dialect> QueryBuilder<D> {
     /// chain intact.
     ///
     /// ```
-    /// # #[cfg(feature = "v2")] {
-    /// use chain_builder::v2::{Postgres, QueryBuilder};
+    /// use chain_builder::{Postgres, QueryBuilder};
     /// let active = false;
     /// let (sql, _) = QueryBuilder::<Postgres>::table("users")
     ///     .select(["id"])
@@ -1166,7 +1174,6 @@ impl<D: Dialect> QueryBuilder<D> {
     ///     )
     ///     .to_sql();
     /// assert_eq!(sql, r#"SELECT "id" FROM "users" WHERE "status" = $1"#);
-    /// # }
     /// ```
     pub fn when_else(
         self,
@@ -1189,22 +1196,37 @@ impl<D: Dialect> QueryBuilder<D> {
     /// negative offset. SELECT-only, like [`Self::limit`] / [`Self::offset`].
     ///
     /// ```
-    /// # #[cfg(feature = "v2")] {
-    /// use chain_builder::v2::{Postgres, QueryBuilder, Value};
+    /// use chain_builder::{Postgres, QueryBuilder, Value};
     /// let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     ///     .select(["id"])
     ///     .paginate(2, 10)
     ///     .to_sql();
     /// assert_eq!(sql, r#"SELECT "id" FROM "users" LIMIT $1 OFFSET $2"#);
     /// assert_eq!(binds, vec![Value::I64(10), Value::I64(10)]);
-    /// # }
     /// ```
     pub fn paginate(self, page: i64, per_page: i64) -> Self {
         self.limit(per_page).offset((page - 1).max(0) * per_page)
     }
 
-    /// Compile to `(sql, binds)`.
+    /// Compile to `(sql, binds)`, panicking on an invalid builder.
+    ///
+    /// Panicking twin of [`Self::try_to_sql`]; the panic message is the
+    /// [`BuildError`]'s `Display` text. Prefer [`Self::try_to_sql`] when any
+    /// part of the query is driven by runtime input (e.g. an HTTP request), so
+    /// misuse maps to an error response instead of a crash.
     pub fn to_sql(&self) -> (String, Vec<Value>) {
         compile(self)
+    }
+
+    /// Compile to `(sql, binds)`, or return the [`BuildError`] describing why
+    /// the query cannot be rendered (invalid construction such as `offset()`
+    /// without `limit()`, an empty `insert()`/`update()`, a row lock outside
+    /// SELECT, or a disallowed `having()` operator).
+    ///
+    /// Errors recorded by builder methods (deferred, chain-preserving) and
+    /// errors detected during compilation — including inside nested builders
+    /// (CTEs, UNION arms, subqueries) — all surface here.
+    pub fn try_to_sql(&self) -> Result<(String, Vec<Value>), BuildError> {
+        try_compile(self)
     }
 }

@@ -5,7 +5,9 @@
 //! runtime string, `having()` takes `op: &str` for ergonomics. To keep that
 //! from becoming a SQL-injection vector when a caller wires an
 //! attacker-controlled operator into the HAVING clause, the operator is
-//! validated against a fixed allowlist and a disallowed operator panics
+//! validated against a fixed allowlist. A disallowed operator records a
+//! deferred `BuildError`: `try_to_sql()` returns it as `Err` (covered in
+//! `tests/build_error.rs`), while `to_sql()` panics with the same message
 //! (fail-loud, matching the `offset`/`distinct_on`/lock guards). Arbitrary
 //! aggregate expressions go through `having_raw` instead.
 

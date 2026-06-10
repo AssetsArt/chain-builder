@@ -18,7 +18,7 @@ mod pg {
         name: String,
     }
 
-    async fn _typechecks(pool: sqlx::PgPool) -> Result<(), sqlx::Error> {
+    async fn _typechecks(pool: sqlx::PgPool) -> Result<(), chain_builder::Error> {
         let qb = QueryBuilder::<Postgres>::table("users")
             .select(["id", "name"])
             .where_gt("id", 0i64);
@@ -57,7 +57,7 @@ mod mysql {
         name: String,
     }
 
-    async fn _typechecks(pool: sqlx::MySqlPool) -> Result<(), sqlx::Error> {
+    async fn _typechecks(pool: sqlx::MySqlPool) -> Result<(), chain_builder::Error> {
         let qb = QueryBuilder::<MySql>::table("users")
             .select(["id", "name"])
             .where_gt("id", 0i64);
@@ -96,7 +96,7 @@ mod sqlite {
         name: String,
     }
 
-    async fn _typechecks(pool: sqlx::SqlitePool) -> Result<(), sqlx::Error> {
+    async fn _typechecks(pool: sqlx::SqlitePool) -> Result<(), chain_builder::Error> {
         let qb = QueryBuilder::<Sqlite>::table("users")
             .select(["id", "name"])
             .where_gt("id", 0i64);

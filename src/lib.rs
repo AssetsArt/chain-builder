@@ -30,6 +30,7 @@
 pub mod builder;
 pub mod compile;
 pub mod dialect;
+pub mod error;
 pub mod ident;
 pub mod value;
 pub mod where_;
@@ -51,8 +52,9 @@ pub use builder::{
     AggFn, ConflictAction, Cte, Having, Join, JoinClause, JoinCond, JoinKind, Lock, LockStrength,
     LockWait, Method, OnConflict, Order, QueryBuilder, SelectExpr,
 };
-pub use compile::compile;
+pub use compile::{compile, try_compile};
 pub use dialect::{Dialect, MySql, Postgres, Sqlite, UpsertStyle};
+pub use error::{BuildError, Error};
 pub use value::{IntoBind, Value};
 pub use where_::{Conj, Predicate, WhereBuilder};
 
@@ -61,4 +63,4 @@ pub use where_::{Conj, Predicate, WhereBuilder};
     feature = "sqlx_sqlite",
     feature = "sqlx_postgres"
 ))]
-pub use sqlx_bind::SqlxDialect;
+pub use sqlx_bind::{SqlxDialect, SqlxQuery, SqlxQueryAs};

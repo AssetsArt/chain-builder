@@ -248,17 +248,35 @@ impl SqlxDialect for Sqlite {
     }
 }
 
+/// The `sqlx::query::Query` type a [`QueryBuilder<D>`] hands off to.
+pub type SqlxQuery<'q, D> = sqlx::query::Query<
+    'q,
+    <D as SqlxDialect>::Database,
+    <<D as SqlxDialect>::Database as sqlx::Database>::Arguments,
+>;
+
+/// The `sqlx::query::QueryAs` type a [`QueryBuilder<D>`] hands off to,
+/// decoding rows into `T`.
+pub type SqlxQueryAs<'q, D, T> = sqlx::query::QueryAs<
+    'q,
+    <D as SqlxDialect>::Database,
+    T,
+    <<D as SqlxDialect>::Database as sqlx::Database>::Arguments,
+>;
+
 #[cfg(any(
     feature = "sqlx_postgres",
     feature = "sqlx_mysql",
     feature = "sqlx_sqlite"
 ))]
 impl<D: SqlxDialect> QueryBuilder<D> {
-    /// Build an executable `sqlx::query::Query` from this builder.
+    /// Build an executable `sqlx::query::Query` from this builder, panicking on
+    /// an invalid builder.
     ///
     /// The SQL is builder-generated with bound placeholders, so it is asserted
     /// safe via `sqlx::AssertSqlSafe` (which also satisfies sqlx 0.9's `'static`
-    /// SQL bound). Mirrors 1.x `ChainBuilder::to_sqlx_query`.
+    /// SQL bound). Mirrors 1.x `ChainBuilder::to_sqlx_query`. Panicking twin of
+    /// [`Self::try_to_sqlx_query`].
     pub fn to_sqlx_query(
         &self,
     ) -> sqlx::query::Query<'_, D::Database, <D::Database as sqlx::Database>::Arguments> {
@@ -266,7 +284,20 @@ impl<D: SqlxDialect> QueryBuilder<D> {
         sqlx::query_with(sqlx::AssertSqlSafe(sql), D::bind_arguments(&binds))
     }
 
-    /// Build an executable `sqlx::query::QueryAs` decoding rows into `T`.
+    /// Build an executable `sqlx::query::Query`, or return the
+    /// [`BuildError`](crate::BuildError) when the builder is invalid (see
+    /// [`try_to_sql`](QueryBuilder::try_to_sql)).
+    pub fn try_to_sqlx_query(&self) -> Result<SqlxQuery<'_, D>, crate::BuildError> {
+        let (sql, binds) = self.try_to_sql()?;
+        Ok(sqlx::query_with(
+            sqlx::AssertSqlSafe(sql),
+            D::bind_arguments(&binds),
+        ))
+    }
+
+    /// Build an executable `sqlx::query::QueryAs` decoding rows into `T`,
+    /// panicking on an invalid builder. Panicking twin of
+    /// [`Self::try_to_sqlx_query_as`].
     pub fn to_sqlx_query_as<T>(
         &self,
     ) -> sqlx::query::QueryAs<'_, D::Database, T, <D::Database as sqlx::Database>::Arguments>
@@ -275,5 +306,19 @@ impl<D: SqlxDialect> QueryBuilder<D> {
     {
         let (sql, binds) = self.to_sql();
         sqlx::query_as_with(sqlx::AssertSqlSafe(sql), D::bind_arguments(&binds))
+    }
+
+    /// Build an executable `sqlx::query::QueryAs` decoding rows into `T`, or
+    /// return the [`BuildError`](crate::BuildError) when the builder is invalid
+    /// (see [`try_to_sql`](QueryBuilder::try_to_sql)).
+    pub fn try_to_sqlx_query_as<T>(&self) -> Result<SqlxQueryAs<'_, D, T>, crate::BuildError>
+    where
+        T: for<'r> sqlx::FromRow<'r, <D::Database as sqlx::Database>::Row>,
+    {
+        let (sql, binds) = self.try_to_sql()?;
+        Ok(sqlx::query_as_with(
+            sqlx::AssertSqlSafe(sql),
+            D::bind_arguments(&binds),
+        ))
     }
 }
