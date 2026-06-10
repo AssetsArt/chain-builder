@@ -13,6 +13,12 @@ parameters, automatic identifier escaping, dialect-correct placeholders
 > — the API is entirely new (typed binds, `Dialect`-generic, no `serde_json::Value`
 > in the core).
 
+## Documentation
+
+- **[User guide](https://assetsart.github.io/chain-builder/)** — full documentation site (queries, binds, errors, sqlx, cookbook).
+- **[API reference](https://docs.rs/chain-builder)** — rustdoc on docs.rs.
+- **[Changelog](CHANGELOG.md)** — release notes and breaking changes.
+
 ## Features
 
 - **Dialect-generic** — one builder, three dialects; mixing them is a compile error.
