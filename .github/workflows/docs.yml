@@ -1,0 +1,66 @@
+name: Docs
+
+# Builds the mdBook documentation site and deploys it to GitHub Pages.
+#
+# Triggers:
+#   - Pushing to `main` when the book or this workflow changes — build + deploy.
+#   - Pull requests touching the same paths — build only (no deploy).
+#   - Manually via the "Run workflow" button (workflow_dispatch).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/book/**"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "docs/book/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build book
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mdBook
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.5.3/mdbook-v0.5.3-x86_64-unknown-linux-gnu.tar.gz \
+            | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: mdbook build docs/book
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/book/book
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

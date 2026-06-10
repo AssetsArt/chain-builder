@@ -1,0 +1,13 @@
+[book]
+title = "chain-builder"
+authors = ["AssetsArt"]
+description = "A typed, dialect-aware SQL query builder for Rust"
+language = "en"
+src = "src"
+
+[build]
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/AssetsArt/chain-builder"
+edit-url-template = "https://github.com/AssetsArt/chain-builder/edit/main/docs/book/{path}"
