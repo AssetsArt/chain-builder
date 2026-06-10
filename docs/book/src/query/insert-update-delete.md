@@ -126,6 +126,32 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 // binds == [Value::I64(2), Value::Text("a".into()), Value::I64(1)]
 ```
 
+## UPDATE expressions: `set_raw`, `increment`, `decrement`
+
+Plain `update()` can only bind values (`SET "col" = $1`). Three companions
+cover computed assignments (3.1.0+). All three switch the builder to UPDATE,
+so `increment` alone is a valid statement:
+
+```rust,ignore
+use chain_builder::{Postgres, QueryBuilder, Value};
+
+let (sql, binds) = QueryBuilder::<Postgres>::table("t")
+    .update([("name", "x")])
+    .increment("views", 1i64)
+    .set_raw("updated_at", "NOW()", vec![])
+    .where_eq("id", 9i64)
+    .to_sql();
+// UPDATE "t" SET "name" = $1, "views" = "views" + $2, "updated_at" = NOW() WHERE "id" = $3
+```
+
+Ordering: the (sorted) `update()` columns render first, then expressions in
+call order. `increment`/`decrement` are fully structured — column escaped,
+amount bound. `set_raw` is the verbatim escape hatch and follows the same
+positional-placeholder contract as `where_raw`: on Postgres hand-write `$N`
+counting all binds accumulated so far (`SET` precedes `WHERE`, and a
+preceding `increment`/`decrement` counts as one bind); on MySQL/SQLite use
+`?`. Duplicate target columns are not detected — the database reports them.
+
 ## `delete()`
 
 `delete` takes no arguments; WHERE applies as usual:
@@ -155,8 +181,10 @@ valid SQL, so the compiler refuses to render it:
 
 - empty `insert(…)` / `insert_many(…)` → `BuildError::EmptyInsert`
   (`insert() requires at least one column`)
-- empty `update(…)` → `BuildError::EmptyUpdate`
-  (`update() requires at least one column`)
+- `update(…)` with no columns **and** no `SET` expressions →
+  `BuildError::EmptyUpdate` (`update() requires at least one column`).
+  An empty `update(…)` plus an `increment`/`decrement`/`set_raw` is a
+  valid UPDATE (3.1.0+).
 
 As always, [`try_to_sql()`](../error-handling.md) returns the error and
 `to_sql()` panics with the same message:

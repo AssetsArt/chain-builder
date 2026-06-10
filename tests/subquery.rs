@@ -177,3 +177,97 @@ fn regression_plain_builder_unchanged() {
         vec![Value::Bool(true), Value::I64(18), Value::I64(10)]
     );
 }
+
+// --- 3.1.0: subquery predicates inside and_where / or_where groups ---
+
+#[test]
+fn pg_group_where_exists_continuity() {
+    let (sql, binds) = QueryBuilder::<Postgres>::table("users")
+        .select(["id"])
+        .where_eq("active", true)
+        .and_where(|g| {
+            g.where_exists(
+                QueryBuilder::<Postgres>::table("orders")
+                    .select(["1"])
+                    .where_column("orders.user_id", "=", "users.id")
+                    .where_gt("total", 100i64),
+            )
+            .or_where(|h| h.where_eq("vip", true))
+        })
+        .to_sql();
+    assert_eq!(
+        sql,
+        r#"SELECT "id" FROM "users" WHERE "active" = $1 AND (EXISTS (SELECT "1" FROM "orders" WHERE "orders"."user_id" = "users"."id" AND "total" > $2) OR ("vip" = $3))"#
+    );
+    assert_eq!(
+        binds,
+        vec![Value::Bool(true), Value::I64(100), Value::Bool(true)]
+    );
+}
+
+#[test]
+fn pg_group_in_subquery_and_not_exists() {
+    let (sql, binds) = QueryBuilder::<Postgres>::table("users")
+        .select(["id"])
+        .and_where(|g| {
+            g.where_in_subquery(
+                "id",
+                QueryBuilder::<Postgres>::table("ban")
+                    .select(["user_id"])
+                    .where_eq("k", 7i64),
+            )
+            .where_not_exists(
+                QueryBuilder::<Postgres>::table("audit")
+                    .select(["1"])
+                    .where_eq("level", 3i64),
+            )
+        })
+        .to_sql();
+    // The second sub-query inside the same group continues numbering at $2.
+    assert_eq!(
+        sql,
+        r#"SELECT "id" FROM "users" WHERE ("id" IN (SELECT "user_id" FROM "ban" WHERE "k" = $1) AND NOT EXISTS (SELECT "1" FROM "audit" WHERE "level" = $2))"#
+    );
+    assert_eq!(binds, vec![Value::I64(7), Value::I64(3)]);
+}
+
+#[test]
+fn pg_or_group_with_subquery_first_suppresses_leading_or() {
+    // A subquery predicate as the sole content of an or_where group that is
+    // itself the first WHERE clause: the leading ` OR ` must be suppressed.
+    let (sql, binds) = QueryBuilder::<Postgres>::table("users")
+        .select(["id"])
+        .or_where(|g| {
+            g.where_exists(
+                QueryBuilder::<Postgres>::table("orders")
+                    .select(["1"])
+                    .where_eq("paid", true),
+            )
+        })
+        .to_sql();
+    assert_eq!(
+        sql,
+        r#"SELECT "id" FROM "users" WHERE (EXISTS (SELECT "1" FROM "orders" WHERE "paid" = $1))"#
+    );
+    assert_eq!(binds, vec![Value::Bool(true)]);
+}
+
+#[test]
+fn mysql_group_not_in_subquery() {
+    let (sql, binds) = QueryBuilder::<MySql>::table("users")
+        .select(["id"])
+        .and_where(|g| {
+            g.where_not_in_subquery(
+                "id",
+                QueryBuilder::<MySql>::table("ban")
+                    .select(["user_id"])
+                    .where_eq("k", 7i64),
+            )
+        })
+        .to_sql();
+    assert_eq!(
+        sql,
+        "SELECT `id` FROM `users` WHERE (`id` NOT IN (SELECT `user_id` FROM `ban` WHERE `k` = ?))"
+    );
+    assert_eq!(binds, vec![Value::I64(7)]);
+}

@@ -191,10 +191,8 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 ## Groups: `and_where` / `or_where`
 
 To get parentheses and `OR`, pass a closure to `and_where` or `or_where`. The
-closure receives a `WhereBuilder` exposing the predicate methods — everything
-except the subquery predicates (`where_exists`, `where_not_exists`,
-`where_in_subquery`, `where_not_in_subquery`) — plus `and_where`/`or_where`
-again, so groups nest. The method name decides how the
+closure receives a `WhereBuilder` exposing the predicate methods, plus
+`and_where`/`or_where` again, so groups nest. The method name decides how the
 group attaches to what precedes it (`AND (…)` vs `OR (…)`); inside the group,
 predicates are joined with `AND` unless they are themselves `or_where`
 sub-groups:
@@ -215,6 +213,29 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("t")
     .and_where(|g| g.where_eq("a", 1i64).or_where(|h| h.where_eq("b", 2i64)))
     .to_sql();
 // SELECT * FROM "t" WHERE ("a" = $1 OR ("b" = $2))
+```
+
+Since 3.1.0 the four subquery predicates are also available **inside**
+groups, with the same contracts (placeholder continuity included):
+
+```rust,ignore
+let (sql, _) = QueryBuilder::<Postgres>::table("users")
+    .select(["id"])
+    .and_where(|g| {
+        g.where_in_subquery(
+            "id",
+            QueryBuilder::<Postgres>::table("ban")
+                .select(["user_id"])
+                .where_eq("k", 7i64),
+        )
+        .where_not_exists(
+            QueryBuilder::<Postgres>::table("audit")
+                .select(["1"])
+                .where_eq("level", 3i64),
+        )
+    })
+    .to_sql();
+// SELECT "id" FROM "users" WHERE ("id" IN (SELECT "user_id" FROM "ban" WHERE "k" = $1) AND NOT EXISTS (SELECT "1" FROM "audit" WHERE "level" = $2))
 ```
 
 Two edge cases are handled for you:

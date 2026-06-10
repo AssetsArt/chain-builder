@@ -197,6 +197,29 @@ Bound **natively** on Postgres (`NUMERIC`) and MySQL (`DECIMAL`).
 > exact storage/round-trip only; for numeric range queries, store a scaled
 > integer (cents) or compare with `CAST(price AS REAL)`.
 
+## Inspecting a query: `to_sql_pretty`
+
+For logs and debugging, `to_sql_pretty()` (3.1.0+) renders the SQL plus one
+line per bind. `try_to_sql_pretty()` is the fallible twin and surfaces the
+same `BuildError` as `try_to_sql()`:
+
+```rust,ignore
+let qb = QueryBuilder::<Postgres>::table("users")
+    .select(["id"])
+    .where_eq("status", "active")
+    .where_gt("age", 21i64);
+println!("{}", qb.to_sql_pretty());
+// SELECT "id" FROM "users" WHERE "status" = $1 AND "age" > $2
+// binds:
+//   $1 = Text("active")
+//   $2 = I64(21)
+```
+
+On `?`-placeholder dialects (MySQL/SQLite) the bind labels carry a 1-based
+ordinal for readability (`?1 = …`); the SQL itself still uses bare `?`. The
+output includes the literal bind values — don't log it if a bind may carry
+sensitive data. The output format is for humans — not a stability contract.
+
 ## Where the binds go from here
 
 `to_sql()` / `try_to_sql()` stop at `(String, Vec<Value>)` — useful for

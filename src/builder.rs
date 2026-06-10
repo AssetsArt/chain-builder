@@ -228,6 +228,33 @@ pub enum SelectExpr {
     },
 }
 
+/// A structured or raw `SET` expression for UPDATE. Backs
+/// [`QueryBuilder::set_raw`] / [`QueryBuilder::increment`] /
+/// [`QueryBuilder::decrement`]. Rendered after the (sorted) structured
+/// `update()` columns, in call order.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum SetExpr {
+    /// `{esc col} = {expr verbatim}` with its own binds (NOT escaped or
+    /// renumbered — the `where_raw` contract).
+    Raw {
+        /// Column identifier; escaped in compile.rs.
+        col: String,
+        /// Verbatim RHS expression.
+        expr: String,
+        /// Binds appended to the running bind list in order.
+        binds: Vec<Value>,
+    },
+    /// `{esc col} = {esc col} {+|-} {placeholder}` — structured step.
+    Step {
+        /// Column identifier; escaped in compile.rs.
+        col: String,
+        /// The step amount, bound via the normal placeholder machinery.
+        by: Value,
+        /// `false` → `+` (increment); `true` → `-` (decrement).
+        neg: bool,
+    },
+}
+
 /// The strength of a row-locking clause.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LockStrength {
@@ -301,6 +328,9 @@ pub struct QueryBuilder<D: Dialect> {
     pub(crate) wheres: Vec<Predicate<D>>,
     pub(crate) method: Method,
     pub(crate) set: Vec<(String, Value)>,
+    /// UPDATE `SET` expressions, rendered after the sorted `set` pairs in
+    /// call order. Backs `set_raw`/`increment`/`decrement`.
+    pub(crate) set_exprs: Vec<SetExpr>,
     /// Multi-row `INSERT` rows (empty unless `insert_many` was used). Each row is
     /// a `(column, value)` list; columns come from the first row's sorted keys.
     pub(crate) insert_rows: Vec<Vec<(String, Value)>>,
@@ -346,6 +376,7 @@ impl<D: Dialect> QueryBuilder<D> {
             wheres: Vec::new(),
             method: Method::Select,
             set: Vec::new(),
+            set_exprs: Vec::new(),
             insert_rows: Vec::new(),
             joins: Vec::new(),
             groups: Vec::new(),
@@ -766,6 +797,78 @@ impl<D: Dialect> QueryBuilder<D> {
             .into_iter()
             .map(|(k, v)| (k.as_ref().to_owned(), v.into_bind()))
             .collect();
+        self
+    }
+
+    /// Set a column to a **verbatim** SQL expression — the UPDATE escape
+    /// hatch. Switches the builder to UPDATE, like [`Self::update`] (and
+    /// like every method-selecting call, last one wins: switching away from
+    /// UPDATE afterwards leaves the expressions ignored).
+    ///
+    /// `col` is identifier-escaped; `expr` is emitted verbatim with `binds`
+    /// appended. Expressions render after the (sorted) structured
+    /// [`Self::update`] columns, in call order. Duplicate target columns are
+    /// not detected — the database reports them.
+    ///
+    /// # Warning: positional placeholder contract
+    ///
+    /// `expr` is NOT escaped or renumbered. For **Postgres**, hand-write
+    /// `$N` matching the actual bind position at the point this expression
+    /// is reached — `SET` precedes `WHERE`, so that is `(number of
+    /// structured SET binds) + (binds of all earlier expressions, counting
+    /// 1 per preceding `increment`/`decrement`) + 1`, `+2`, … For
+    /// MySQL/SQLite use `?`. A wrong `$N` produces a malformed query.
+    ///
+    /// ```
+    /// use chain_builder::{Postgres, QueryBuilder, Value};
+    /// let (sql, binds) = QueryBuilder::<Postgres>::table("t")
+    ///     .update([("name", "x")])
+    ///     .set_raw("updated_at", "NOW()", vec![])
+    ///     .to_sql();
+    /// assert_eq!(sql, r#"UPDATE "t" SET "name" = $1, "updated_at" = NOW()"#);
+    /// assert_eq!(binds, vec![Value::Text("x".into())]);
+    /// ```
+    pub fn set_raw(mut self, col: &str, expr: &str, binds: Vec<Value>) -> Self {
+        self.method = Method::Update;
+        self.set_exprs.push(SetExpr::Raw {
+            col: col.to_owned(),
+            expr: expr.to_owned(),
+            binds,
+        });
+        self
+    }
+
+    /// `col = col + value` — atomic counter increment. Structured (column
+    /// escaped, value bound); switches the builder to UPDATE, so
+    /// `qb.increment("views", 1)` alone is a valid UPDATE.
+    ///
+    /// ```
+    /// use chain_builder::{Postgres, QueryBuilder, Value};
+    /// let (sql, binds) = QueryBuilder::<Postgres>::table("t")
+    ///     .increment("views", 1i64)
+    ///     .to_sql();
+    /// assert_eq!(sql, r#"UPDATE "t" SET "views" = "views" + $1"#);
+    /// assert_eq!(binds, vec![Value::I64(1)]);
+    /// ```
+    pub fn increment(mut self, col: &str, by: impl IntoBind) -> Self {
+        self.method = Method::Update;
+        self.set_exprs.push(SetExpr::Step {
+            col: col.to_owned(),
+            by: by.into_bind(),
+            neg: false,
+        });
+        self
+    }
+
+    /// `col = col - value` — atomic counter decrement. See
+    /// [`Self::increment`].
+    pub fn decrement(mut self, col: &str, by: impl IntoBind) -> Self {
+        self.method = Method::Update;
+        self.set_exprs.push(SetExpr::Step {
+            col: col.to_owned(),
+            by: by.into_bind(),
+            neg: true,
+        });
         self
     }
 
@@ -1228,5 +1331,63 @@ impl<D: Dialect> QueryBuilder<D> {
     /// (CTEs, UNION arms, subqueries) — all surface here.
     pub fn try_to_sql(&self) -> Result<(String, Vec<Value>), BuildError> {
         try_compile(self)
+    }
+
+    /// Render the compiled query as a human-readable string for logs and
+    /// debugging: the SQL, then one indented line per bind.
+    ///
+    /// ```
+    /// use chain_builder::{Postgres, QueryBuilder};
+    /// let qb = QueryBuilder::<Postgres>::table("users")
+    ///     .select(["id"])
+    ///     .where_eq("status", "active");
+    /// assert_eq!(
+    ///     qb.to_sql_pretty(),
+    ///     "SELECT \"id\" FROM \"users\" WHERE \"status\" = $1\nbinds:\n  $1 = Text(\"active\")"
+    /// );
+    /// ```
+    ///
+    /// Bind labels are the dialect placeholder (`$1`, `$2`, … on Postgres);
+    /// dialects whose placeholder is a bare `?` get a 1-based ordinal
+    /// appended for readability (`?1`, `?2`, …) — the SQL itself still uses
+    /// `?`. With zero binds the output is the SQL line only. The output
+    /// format is for humans and is **not** a stability contract.
+    ///
+    /// # Warning
+    ///
+    /// The output includes the **literal bind values**. Do not log it if
+    /// any bind may contain sensitive data (passwords, tokens, PII).
+    ///
+    /// Panicking twin of [`Self::try_to_sql_pretty`]; the panic message is
+    /// the [`BuildError`]'s `Display` text (same policy as
+    /// [`Self::to_sql`]).
+    pub fn to_sql_pretty(&self) -> String {
+        self.try_to_sql_pretty().unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Fallible twin of [`Self::to_sql_pretty`]; surfaces the same
+    /// [`BuildError`] as [`Self::try_to_sql`]. The same sensitive-data
+    /// warning applies.
+    pub fn try_to_sql_pretty(&self) -> Result<String, BuildError> {
+        use std::fmt::Write as _;
+        let (sql, binds) = try_compile(self)?;
+        let mut out = sql;
+        if !binds.is_empty() {
+            out.push_str("\nbinds:");
+            let mut label = String::with_capacity(4);
+            for (i, b) in binds.iter().enumerate() {
+                label.clear();
+                D::write_placeholder(&mut label, i + 1);
+                if label == "?" {
+                    // Infallible for String.
+                    let _ = write!(label, "{}", i + 1);
+                }
+                out.push_str("\n  ");
+                out.push_str(&label);
+                out.push_str(" = ");
+                let _ = write!(out, "{b:?}");
+            }
+        }
+        Ok(out)
     }
 }

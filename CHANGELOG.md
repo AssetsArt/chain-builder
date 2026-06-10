@@ -1,5 +1,29 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Subquery predicates inside `and_where`/`or_where` groups.**
+  `WhereBuilder` gains `where_exists`, `where_not_exists`,
+  `where_in_subquery`, `where_not_in_subquery`, mirroring the `QueryBuilder`
+  methods (same contracts, placeholder continuity included) — closing the
+  group/top-level API asymmetry.
+- **UPDATE expressions.** `set_raw(col, expr, binds)` (verbatim escape
+  hatch, `where_raw` placeholder contract), plus structured
+  `increment(col, by)` / `decrement(col, by)` for atomic counters. All
+  three switch the builder to UPDATE; expressions render after the sorted
+  `update()` columns, in call order. `EmptyUpdate` now fires only when both
+  the column set and the expression list are empty (message unchanged).
+- **`escape_like()`** at the crate root: escapes `\`, `%`, `_` so user
+  input matches literally in `LIKE`/`ILIKE` patterns (promoted from the
+  cookbook recipe; pair with an explicit `ESCAPE` clause for full
+  portability).
+- **`to_sql_pretty()` / `try_to_sql_pretty()`**: human-readable
+  `(sql, binds)` rendering for logs. Output includes literal bind values;
+  format is not a stability contract. Twin-API policy applies (panicking
+  twin's message is the `BuildError` Display text).
+
 ## [3.0.0] - 2026-06-10
 
 ### Added

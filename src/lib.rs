@@ -32,6 +32,7 @@ pub mod compile;
 pub mod dialect;
 pub mod error;
 pub mod ident;
+pub mod like;
 pub mod value;
 pub mod where_;
 
@@ -55,6 +56,7 @@ pub use builder::{
 pub use compile::{compile, try_compile};
 pub use dialect::{Dialect, MySql, Postgres, Sqlite, UpsertStyle};
 pub use error::{BuildError, Error};
+pub use like::escape_like;
 pub use value::{IntoBind, Value};
 pub use where_::{Conj, Predicate, WhereBuilder};
 

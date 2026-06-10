@@ -48,18 +48,12 @@ correctness and abuse problem: a filter that should narrow results can be
 forced wide open, and pathological patterns (`%a%b%c%d%…`) make the database
 scan hard.
 
-Escape the three metacharacters yourself before splicing input into a
-pattern (backslash first — order matters):
+Escape the three metacharacters before splicing input into a pattern —
+backslash first, then `%` and `_` (order matters, or the backslashes
+produced for `%`/`_` get double-escaped). The crate ships exactly this:
 
 ```rust,ignore
-/// Escape LIKE/ILIKE metacharacters so user input matches literally.
-/// `\` must be escaped first, then `%` and `_`.
-fn escape_like(input: &str) -> String {
-    input
-        .replace('\\', "\\\\")
-        .replace('%', "\\%")
-        .replace('_', "\\_")
-}
+use chain_builder::escape_like; // in-crate since 3.1.0
 
 assert_eq!(escape_like("100%_a\\b"), "100\\%\\_a\\\\b");
 ```
@@ -74,7 +68,7 @@ The portable fix is an explicit `ESCAPE` clause, which the structured
 [`where_raw`](../query/where.md) job:
 
 ```rust,ignore
-use chain_builder::{Postgres, QueryBuilder, Value};
+use chain_builder::{escape_like, Postgres, QueryBuilder, Value};
 
 let q = "50%"; // raw user input
 let pattern = format!("%{}%", escape_like(q)); // "%50\%%"
@@ -90,11 +84,11 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
     )
     .to_sql();
 // SELECT "id", "name" FROM "users" WHERE "status" = $1 AND LOWER("name") LIKE LOWER($2) ESCAPE '\'
+```
 
 On MySQL, write the escape literal as `ESCAPE '\\'` — inside a MySQL string
 literal a single backslash escapes the closing quote, so `'\'` is a syntax
 error. (SQLite accepts `'\'` as-is.)
-```
 
 Now `50%` matches only names containing the literal text `50%`. Mind the
 `where_raw` contract: the fragment is emitted verbatim — hand-write the
