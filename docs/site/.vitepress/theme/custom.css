@@ -22,6 +22,10 @@
   .DocSearch-Button {
     min-width: 280px;
   }
+  /* push the ⌘K hint to the far right of the widened box */
+  .DocSearch-Button-Keys {
+    margin-left: auto;
+  }
 }
 
 /* ── Home: animated grainient hero (canvas in GrainientBackground.vue) ── */
