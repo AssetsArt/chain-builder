@@ -1,6 +1,6 @@
 //! 3.1.0: `to_sql_pretty` / `try_to_sql_pretty`.
 
-use chain_builder::{Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn pg_pretty_multi_bind() {
@@ -51,4 +51,16 @@ fn pretty_panic_twin_message_parity() {
     let _ = QueryBuilder::<Postgres>::table("t")
         .update(std::iter::empty::<(&str, Value)>())
         .to_sql_pretty();
+}
+
+#[test]
+fn mysql_pretty_labels_ordinals() {
+    let out = QueryBuilder::<MySql>::table("users")
+        .select(["id"])
+        .where_eq("status", "active")
+        .to_sql_pretty();
+    assert_eq!(
+        out,
+        "SELECT `id` FROM `users` WHERE `status` = ?\nbinds:\n  ?1 = Text(\"active\")"
+    );
 }

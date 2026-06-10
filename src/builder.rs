@@ -1353,6 +1353,11 @@ impl<D: Dialect> QueryBuilder<D> {
     /// `?`. With zero binds the output is the SQL line only. The output
     /// format is for humans and is **not** a stability contract.
     ///
+    /// # Warning
+    ///
+    /// The output includes the **literal bind values**. Do not log it if
+    /// any bind may contain sensitive data (passwords, tokens, PII).
+    ///
     /// Panicking twin of [`Self::try_to_sql_pretty`]; the panic message is
     /// the [`BuildError`]'s `Display` text (same policy as
     /// [`Self::to_sql`]).
@@ -1361,22 +1366,26 @@ impl<D: Dialect> QueryBuilder<D> {
     }
 
     /// Fallible twin of [`Self::to_sql_pretty`]; surfaces the same
-    /// [`BuildError`] as [`Self::try_to_sql`].
+    /// [`BuildError`] as [`Self::try_to_sql`]. The same sensitive-data
+    /// warning applies.
     pub fn try_to_sql_pretty(&self) -> Result<String, BuildError> {
+        use std::fmt::Write as _;
         let (sql, binds) = try_compile(self)?;
         let mut out = sql;
         if !binds.is_empty() {
             out.push_str("\nbinds:");
+            let mut label = String::with_capacity(4);
             for (i, b) in binds.iter().enumerate() {
-                let mut label = String::new();
+                label.clear();
                 D::write_placeholder(&mut label, i + 1);
                 if label == "?" {
-                    label.push_str(&(i + 1).to_string());
+                    // Infallible for String.
+                    let _ = write!(label, "{}", i + 1);
                 }
                 out.push_str("\n  ");
                 out.push_str(&label);
                 out.push_str(" = ");
-                out.push_str(&format!("{b:?}"));
+                let _ = write!(out, "{b:?}");
             }
         }
         Ok(out)
