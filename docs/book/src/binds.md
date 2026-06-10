@@ -205,6 +205,29 @@ feature enabled, `to_sqlx_query()` and the `fetch_*` helpers translate each
 `Value` into the backend's argument buffer and execute it — the SQL string
 still never contains a value. See [Executing with sqlx](sqlx.md).
 
+## Inspecting a query: `to_sql_pretty`
+
+For logs and debugging, `to_sql_pretty()` (3.1.0+) renders the SQL plus one
+line per bind. `try_to_sql_pretty()` is the fallible twin and surfaces the
+same `BuildError` as `try_to_sql()`:
+
+```rust,ignore
+let qb = QueryBuilder::<Postgres>::table("users")
+    .select(["id"])
+    .where_eq("status", "active")
+    .where_gt("age", 21i64);
+println!("{}", qb.to_sql_pretty());
+// SELECT "id" FROM "users" WHERE "status" = $1 AND "age" > $2
+// binds:
+//   $1 = Text("active")
+//   $2 = I64(21)
+```
+
+On `?`-placeholder dialects (MySQL/SQLite) the bind labels carry a 1-based
+ordinal for readability (`?1 = …`); the SQL itself still uses bare `?`. The
+output includes the literal bind values — don't log it if a bind may carry
+sensitive data. The output format is for humans — not a stability contract.
+
 ## Related pages
 
 - [Security Model](security.md) — why values are always bound, and what raw fragments do not protect
