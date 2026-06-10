@@ -133,8 +133,10 @@ see [Getting Started](getting-started.md)).
 
 Binds as `Value::Json`. On **all three backends** the JSON is serialized with
 `to_string` and stored as TEXT — it is not bound as a native `jsonb`
-parameter. (Postgres casts text to `json`/`jsonb` columns on insert; for
-jsonb *querying* see [`where_jsonb_contains`](query/where.md).)
+parameter. (Intended for TEXT columns; Postgres has no implicit cast from a
+text parameter to `json`/`jsonb`, so inserting into a `jsonb` column needs an
+explicit `::jsonb` cast in raw SQL. For jsonb *querying* see
+[`where_jsonb_contains`](query/where.md).)
 
 ### `uuid` — `uuid::Uuid`
 

@@ -4,7 +4,8 @@
 SELECT, and `skip_locked()` / `no_wait()` add the ` SKIP LOCKED` / ` NOWAIT`
 modifier. Row locks only mean something **inside a transaction**: you lock the
 rows a SELECT returns so that concurrent transactions cannot modify (or, for
-`FOR UPDATE`, even lock) them until you commit. Honored on Postgres and MySQL;
+`FOR UPDATE`, even lock) them until you commit. Honored on Postgres and MySQL (`FOR SHARE` needs MySQL 8.0+; older versions
+only have `LOCK IN SHARE MODE`, which the builder does not emit);
 a **silent no-op on SQLite** (details below). Locking is strictly a SELECT
 feature — attaching it to anything else, or combining it with `UNION` on a
 locking dialect, is a [`BuildError`](../error-handling.md), not a silent drop.
