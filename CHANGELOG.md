@@ -1,5 +1,53 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Fallible compilation: `BuildError` + the `try_*` family.** Every fail-loud
+  guard that used to be reachable only as a panic now also surfaces as a typed
+  error, so web apps can map invalid query construction to an HTTP 4XX/5XX
+  response instead of crashing:
+  - New `BuildError` enum (`#[non_exhaustive]`, implements
+    `std::error::Error`): `LockRequiresSelect`, `DistinctOnRequiresPostgres`,
+    `EmptyInsert`, `EmptyUpdate`, `OffsetWithoutLimit`, `LockWithUnion`,
+    `InvalidHavingOperator(String)`.
+  - New fallible twins: `QueryBuilder::try_to_sql()`, `try_compile(&qb)`, and
+    (with a `sqlx_*` feature) `try_to_sqlx_query()` / `try_to_sqlx_query_as()`.
+  - The panicking API (`to_sql`, `compile`, `to_sqlx_query`,
+    `to_sqlx_query_as`) is unchanged and panics with exactly the `BuildError`
+    display message.
+  - New `SqlxQuery<'q, D>` / `SqlxQueryAs<'q, D, T>` type aliases for the sqlx
+    handoff types (re-exported at the crate root alongside `SqlxDialect`).
+  - **Policy:** the panicking API (`to_sql`, `compile`, `to_sqlx_query`,
+    `to_sqlx_query_as`) is kept *deliberately* alongside the `try_*` twins —
+    it stays the ergonomic path for static, hand-written queries (tests,
+    migrations, fixed reports), while the `try_*` family is the path for any
+    query shaped by runtime input. Both surfaces are maintained; the panicking
+    twins are not deprecated.
+
+### Changed
+
+- **BREAKING: the execution helpers (`fetch_all`/`fetch_one`/`fetch_optional`/
+  `execute`/`count`/`fetch_scalar`/`fetch_optional_scalar`) now return
+  `Result<_, chain_builder::Error>` instead of `Result<_, sqlx::Error>`.**
+  `Error` is a unified enum: `Error::Build(BuildError)` for invalid query
+  construction (returned **before** touching the database — previously a
+  panic) and `Error::Sqlx(sqlx::Error)` for database/driver failures. It
+  implements `std::error::Error` (with `source()`), `Display`, and
+  `From<BuildError>` / `From<sqlx::Error>`, so existing `?` call sites
+  migrate by switching the function's error type to `chain_builder::Error`
+  (or any type with `From<chain_builder::Error>`); match on `Error::Sqlx(e)`
+  to recover the inner sqlx error (e.g. `RowNotFound`).
+
+- **`having()` with a disallowed operator no longer panics at the call site.**
+  The error is recorded on the builder (first error wins, the chain stays
+  intact) and surfaces at compile time: `try_to_sql()` returns
+  `Err(BuildError::InvalidHavingOperator)`, `to_sql()` panics with the same
+  message as before — including when the offending builder is nested as a CTE,
+  UNION arm, or subquery. Code that called `having()` with a bad operator and
+  never compiled the builder previously panicked; it now does not.
+
 ## [2.1.2] - 2026-06-10
 
 ### Security

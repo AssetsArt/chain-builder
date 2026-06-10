@@ -14,7 +14,9 @@ chain-builder = { version = "2", features = ["sqlx_postgres"] }
 
 `QueryBuilder::<D>::table(name)` starts a query for dialect `D`
 (`Postgres` / `MySql` / `Sqlite`). Every method is by-value chaining; `to_sql()`
-returns `(String, Vec<Value>)`.
+returns `(String, Vec<Value>)` and panics on an invalid builder, while
+`try_to_sql()` returns `Result<(String, Vec<Value>), BuildError>` (see
+[Error handling](#error-handling-try_to_sql--builderror)).
 
 ```rust
 use chain_builder::{QueryBuilder, Postgres, Order};
@@ -63,7 +65,7 @@ Empty `IN ()` → `1 = 0`; empty `NOT IN ()` → `1 = 1`.
 
 `select([cols])` (bare identifiers, dotted ok), `select_raw(expr, binds)` for
 arbitrary expressions, `distinct()`, `distinct_on([cols])` (Postgres only —
-panics elsewhere).
+errors elsewhere: `try_to_sql()` returns `Err`, `to_sql()` panics).
 
 Structured aggregate helpers escape the column at compile time (`*` passed
 through) and accept an optional alias via the `_as` variants:
@@ -162,8 +164,60 @@ let id: i64 = qb.fetch_scalar(&pool).await?;               // first column
 qb.execute(&pool).await?;                                   // INSERT/UPDATE/DELETE
 ```
 
+All execution helpers return `Result<_, chain_builder::Error>`:
+`Error::Build(BuildError)` for invalid query construction (returned before
+touching the database) and `Error::Sqlx(sqlx::Error)` for database failures.
+Both directions have `From` impls, so `?` works in functions whose error type
+converts from either.
+
 All three drivers can be enabled at once (`sqlx_mysql` + `sqlx_sqlite` +
 `sqlx_postgres`).
+
+## Error handling (`try_to_sql` / `BuildError`)
+
+Invalid query construction — `offset()` without `limit()`, an empty
+`insert()`/`update()`, a row lock outside `SELECT` or combined with `UNION`,
+`distinct_on` off Postgres, a disallowed `having()` operator — is a
+`BuildError`. The fallible API returns it; the classic API panics with the same
+message:
+
+| fallible (returns `Result<_, BuildError>`) | panicking twin |
+|---|---|
+| `try_to_sql()` | `to_sql()` |
+| `try_compile(&qb)` | `compile(&qb)` |
+| `try_to_sqlx_query()` | `to_sqlx_query()` |
+| `try_to_sqlx_query_as::<T>()` | `to_sqlx_query_as::<T>()` |
+
+The execution helpers (`fetch_*`, `execute`, `count`) fold both failure modes
+into the unified `Error` enum — `Error::Build(BuildError)` /
+`Error::Sqlx(sqlx::Error)` — so they never panic on an invalid builder.
+
+A disallowed `having()` operator does not panic at the call site — the chain
+stays intact and the error is deferred until compilation (also through nested
+builders: CTEs, UNION arms, subqueries). In a web handler, map `BuildError`
+variants caused by end-user input to HTTP 4XX and the rest to 5XX:
+
+```rust
+match qb.fetch_all::<Row, _>(&pool).await {
+    Ok(rows) => ok(rows),
+    Err(Error::Build(BuildError::InvalidHavingOperator(_))) => bad_request(), // 400
+    Err(Error::Build(e)) => internal_error(e),  // 500 — programmer error
+    Err(Error::Sqlx(e)) => internal_error(e),   // 500 — database failure
+    // `Error` is #[non_exhaustive]: downstream matches need a wildcard arm.
+    Err(e) => internal_error(e),
+}
+```
+
+Both `Error` and `BuildError` are `#[non_exhaustive]` — when matching outside
+this crate, always include a wildcard arm so future variants don't break your
+build.
+
+The panicking API (`to_sql()`, `compile()`, `to_sqlx_query[_as]()`) is kept
+**deliberately** alongside the `try_*` twins: it is the ergonomic choice for
+static, hand-written queries (tests, migrations, fixed reports) where invalid
+construction is a programmer error and a panic message is the fastest signal.
+Use the `try_*` family whenever any part of the query is driven by runtime
+input.
 
 ## Raw escape hatches
 

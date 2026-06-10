@@ -10,6 +10,7 @@ use crate::builder::{
     Order, QueryBuilder, SelectExpr,
 };
 use crate::dialect::{Dialect, UpsertStyle};
+use crate::error::BuildError;
 use crate::ident::escape_identifier;
 use crate::value::Value;
 use crate::where_::{Conj, Predicate};
@@ -54,21 +55,40 @@ impl Ctx {
     }
 }
 
-/// Compile a [`QueryBuilder`] into `(sql, binds)`.
+/// Compile a [`QueryBuilder`] into `(sql, binds)`, panicking on an invalid
+/// builder.
+///
+/// Panicking wrapper over [`try_compile`]; the panic message is the
+/// [`BuildError`]'s `Display` text. Prefer [`try_compile`] /
+/// [`QueryBuilder::try_to_sql`](crate::QueryBuilder::try_to_sql) when the
+/// builder may be fed from runtime input (e.g. an HTTP request).
 pub fn compile<D: Dialect>(qb: &QueryBuilder<D>) -> (String, Vec<Value>) {
+    try_compile(qb).unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// Compile a [`QueryBuilder`] into `(sql, binds)`, or return the
+/// [`BuildError`] describing why the query cannot be rendered.
+pub fn try_compile<D: Dialect>(qb: &QueryBuilder<D>) -> Result<(String, Vec<Value>), BuildError> {
     let mut ctx = Ctx {
         sql: String::new(),
         binds: Vec::new(),
         quote: D::quote_char(),
     };
-    compile_into::<D>(&mut ctx, qb);
-    (ctx.sql, ctx.binds)
+    compile_into::<D>(&mut ctx, qb)?;
+    Ok((ctx.sql, ctx.binds))
 }
 
 /// Write `qb`'s SQL into the existing `ctx`, continuing its binds and
 /// placeholder counter. This is the single-pass core used by [`compile`] (and,
 /// in later M2 tasks, by nested builders such as CTEs/UNION arms).
-fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
+fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) -> Result<(), BuildError> {
+    // A builder method that detected misuse (e.g. `having()` with a disallowed
+    // operator) records the first error instead of panicking mid-chain; it
+    // surfaces here. Checked per nested builder too (CTE/UNION/subquery).
+    if let Some(e) = &qb.error {
+        return Err(e.clone());
+    }
+
     let table = ctx.qualify(qb.db.as_deref(), &qb.table);
 
     // A row lock is only meaningful on SELECT. Attaching one to INSERT/UPDATE/
@@ -76,16 +96,16 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
     // (the caller believes rows are locked when they are not). Fail loud,
     // dialect-independent, like the `offset`/`distinct_on` guards.
     if qb.lock.is_some() && qb.method != Method::Select {
-        panic!("for_update()/for_share() is only valid on SELECT");
+        return Err(BuildError::LockRequiresSelect);
     }
 
     match qb.method {
         Method::Select => {
             // CTEs are emitted first so their binds (and pg `$N`) come first.
-            write_ctes::<D>(ctx, &qb.ctes);
+            write_ctes::<D>(ctx, &qb.ctes)?;
             if !qb.distinct_on.is_empty() {
                 if !D::supports_distinct_on() {
-                    panic!("DISTINCT ON requires PostgreSQL");
+                    return Err(BuildError::DistinctOnRequiresPostgres);
                 }
                 ctx.sql.push_str("SELECT DISTINCT ON (");
                 let cols: Vec<String> = qb.distinct_on.iter().map(|c| ctx.esc(c)).collect();
@@ -96,21 +116,21 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             } else {
                 ctx.sql.push_str("SELECT ");
             }
-            write_select_list::<D>(ctx, qb);
+            write_select_list::<D>(ctx, qb)?;
             ctx.sql.push_str(" FROM ");
             ctx.sql.push_str(&table);
             write_joins::<D>(ctx, &qb.joins, qb.db.as_deref());
-            write_wheres::<D>(ctx, &qb.wheres);
+            write_wheres::<D>(ctx, &qb.wheres)?;
             write_group_by(ctx, &qb.groups, qb.group_by_raw.as_ref());
             write_having::<D>(ctx, &qb.havings);
             write_order_by(ctx, &qb.orders, qb.order_by_raw.as_ref());
-            write_limit_offset::<D>(ctx, qb.limit, qb.offset);
-            write_unions::<D>(ctx, &qb.unions);
-            write_lock::<D>(ctx, qb.lock.as_ref(), !qb.unions.is_empty());
+            write_limit_offset::<D>(ctx, qb.limit, qb.offset)?;
+            write_unions::<D>(ctx, &qb.unions)?;
+            write_lock::<D>(ctx, qb.lock.as_ref(), !qb.unions.is_empty())?;
         }
         Method::Insert => {
             if qb.set.is_empty() && qb.insert_rows.is_empty() {
-                panic!("insert() requires at least one column");
+                return Err(BuildError::EmptyInsert);
             }
 
             // Single-row sorted pairs (preserves the M-prev path byte-for-byte,
@@ -188,7 +208,7 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
         }
         Method::Update => {
             if qb.set.is_empty() {
-                panic!("update() requires at least one column");
+                return Err(BuildError::EmptyUpdate);
             }
             let mut rows: Vec<&(String, Value)> = qb.set.iter().collect();
             rows.sort_by(|a, b| a.0.cmp(&b.0));
@@ -204,16 +224,17 @@ fn compile_into<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
                 ctx.sql.push_str(" = ");
                 ctx.placeholder::<D>(v.clone());
             }
-            write_wheres::<D>(ctx, &qb.wheres);
+            write_wheres::<D>(ctx, &qb.wheres)?;
             write_returning::<D>(ctx, &qb.returning);
         }
         Method::Delete => {
             ctx.sql.push_str("DELETE FROM ");
             ctx.sql.push_str(&table);
-            write_wheres::<D>(ctx, &qb.wheres);
+            write_wheres::<D>(ctx, &qb.wheres)?;
             write_returning::<D>(ctx, &qb.returning);
         }
     }
+    Ok(())
 }
 
 /// Render the upsert conflict clause for an `INSERT` (never called for the
@@ -315,14 +336,14 @@ fn write_group_by(ctx: &mut Ctx, groups: &[String], raw: Option<&(String, Vec<Va
 ///
 /// Written directly into `ctx` (not pre-joined) so subquery binds continue the
 /// placeholder counter in emission order.
-fn write_select_list<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
+fn write_select_list<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) -> Result<(), BuildError> {
     if qb.select_cols.is_empty()
         && qb.select_exprs.is_empty()
         && qb.select_raw.is_empty()
         && qb.select_subqueries.is_empty()
     {
         ctx.sql.push('*');
-        return;
+        return Ok(());
     }
     let mut wrote_any = false;
     for c in &qb.select_cols {
@@ -379,12 +400,13 @@ fn write_select_list<D: Dialect>(ctx: &mut Ctx, qb: &QueryBuilder<D>) {
             ctx.sql.push_str(", ");
         }
         ctx.sql.push('(');
-        compile_into::<D>(ctx, sub);
+        compile_into::<D>(ctx, sub)?;
         ctx.sql.push_str(") AS ");
         let a = ctx.esc(alias);
         ctx.sql.push_str(&a);
         wrote_any = true;
     }
+    Ok(())
 }
 
 /// Render each `JOIN` (SELECT only): ` {KIND} {esc table}[ ON cond AND …]`.
@@ -470,9 +492,9 @@ fn write_having<D: Dialect>(ctx: &mut Ctx, havings: &[Having]) {
 ///
 /// Single-pass per CTE: the name header is written and the body compiled in one
 /// go, so SQL text order equals bind-push order (placeholder/bind never desync).
-fn write_ctes<D: Dialect>(ctx: &mut Ctx, ctes: &[Cte<D>]) {
+fn write_ctes<D: Dialect>(ctx: &mut Ctx, ctes: &[Cte<D>]) -> Result<(), BuildError> {
     if ctes.is_empty() {
-        return;
+        return Ok(());
     }
     ctx.sql.push_str("WITH ");
     if ctes.iter().any(|c| c.recursive) {
@@ -485,19 +507,24 @@ fn write_ctes<D: Dialect>(ctx: &mut Ctx, ctes: &[Cte<D>]) {
         let name = ctx.esc(&cte.name);
         ctx.sql.push_str(&name);
         ctx.sql.push_str(" AS (");
-        compile_into::<D>(ctx, &cte.query);
+        compile_into::<D>(ctx, &cte.query)?;
         ctx.sql.push(')');
     }
     ctx.sql.push(' ');
+    Ok(())
 }
 
 /// Render ` UNION [ALL] body` per arm, AFTER the main query (SELECT only).
-fn write_unions<D: Dialect>(ctx: &mut Ctx, unions: &[(bool, QueryBuilder<D>)]) {
+fn write_unions<D: Dialect>(
+    ctx: &mut Ctx,
+    unions: &[(bool, QueryBuilder<D>)],
+) -> Result<(), BuildError> {
     for (all, arm) in unions {
         ctx.sql
             .push_str(if *all { " UNION ALL " } else { " UNION " });
-        compile_into::<D>(ctx, arm);
+        compile_into::<D>(ctx, arm)?;
     }
+    Ok(())
 }
 
 /// Render `ORDER BY a ASC, b DESC, …` (SELECT only). No-op when empty and no raw
@@ -531,11 +558,15 @@ fn write_order_by(ctx: &mut Ctx, orders: &[(String, Order)], raw: Option<&(Strin
 
 /// Render `LIMIT $n [OFFSET $m]` (SELECT only), binding both values.
 ///
-/// Panics if `offset` is set without `limit` (uniform across dialects; MySQL
+/// Errors if `offset` is set without `limit` (uniform across dialects; MySQL
 /// rejects bare `OFFSET`).
-fn write_limit_offset<D: Dialect>(ctx: &mut Ctx, limit: Option<i64>, offset: Option<i64>) {
+fn write_limit_offset<D: Dialect>(
+    ctx: &mut Ctx,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<(), BuildError> {
     if offset.is_some() && limit.is_none() {
-        panic!("offset(...) requires limit(...)");
+        return Err(BuildError::OffsetWithoutLimit);
     }
     if let Some(n) = limit {
         ctx.sql.push_str(" LIMIT ");
@@ -545,25 +576,30 @@ fn write_limit_offset<D: Dialect>(ctx: &mut Ctx, limit: Option<i64>, offset: Opt
         ctx.sql.push_str(" OFFSET ");
         ctx.placeholder::<D>(Value::I64(n));
     }
+    Ok(())
 }
 
 /// Render a row-locking clause (` FOR UPDATE`/` FOR SHARE` [+ ` SKIP LOCKED`/
 /// ` NOWAIT`]) at the end of a `SELECT`. A **no-op on dialects without row
 /// locking** (SQLite), so the lock is silently dropped there rather than
-/// producing invalid SQL. Panics if a lock is combined with `UNION` on a
+/// producing invalid SQL. Errors if a lock is combined with `UNION` on a
 /// locking dialect (Postgres/MySQL reject that combination).
-fn write_lock<D: Dialect>(ctx: &mut Ctx, lock: Option<&Lock>, has_unions: bool) {
+fn write_lock<D: Dialect>(
+    ctx: &mut Ctx,
+    lock: Option<&Lock>,
+    has_unions: bool,
+) -> Result<(), BuildError> {
     let Some(lock) = lock else {
-        return;
+        return Ok(());
     };
     if !D::supports_row_locking() {
-        return;
+        return Ok(());
     }
     // Postgres/MySQL reject `FOR UPDATE`/`FOR SHARE` on a `UNION` result; emitting
     // it would produce invalid SQL, so fail loud here. (No-op dialects returned
     // above never reach this, so a SQLite lock+UNION stays a harmless no-op.)
     if has_unions {
-        panic!("for_update()/for_share() cannot be combined with UNION");
+        return Err(BuildError::LockWithUnion);
     }
     ctx.sql.push_str(match lock.strength {
         LockStrength::Update => " FOR UPDATE",
@@ -575,6 +611,7 @@ fn write_lock<D: Dialect>(ctx: &mut Ctx, lock: Option<&Lock>, has_unions: bool) 
             LockWait::NoWait => " NOWAIT",
         });
     }
+    Ok(())
 }
 
 /// A predicate produces no SQL if it is an empty group (F4): an empty group
@@ -584,20 +621,20 @@ fn is_omitted<D: Dialect>(p: &Predicate<D>) -> bool {
     matches!(p, Predicate::Group { preds, .. } if preds.is_empty())
 }
 
-fn write_wheres<D: Dialect>(ctx: &mut Ctx, wheres: &[Predicate<D>]) {
+fn write_wheres<D: Dialect>(ctx: &mut Ctx, wheres: &[Predicate<D>]) -> Result<(), BuildError> {
     // Skip empty groups so they neither emit `()` nor force a `WHERE`.
     if wheres.iter().all(is_omitted) {
-        return;
+        return Ok(());
     }
     ctx.sql.push_str(" WHERE ");
-    write_clause_list::<D>(ctx, wheres);
+    write_clause_list::<D>(ctx, wheres)
 }
 
 /// Render a top-level clause list. Predicates are joined by `AND` by default,
 /// but a [`Predicate::Group`] attaches to the preceding clause using its own
 /// outer conjunction (so `or_where` emits `... OR (...)`). Empty groups are
 /// omitted and never contribute a separator.
-fn write_clause_list<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate<D>]) {
+fn write_clause_list<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate<D>]) -> Result<(), BuildError> {
     let mut wrote_any = false;
     for p in preds.iter() {
         if is_omitted(p) {
@@ -613,12 +650,13 @@ fn write_clause_list<D: Dialect>(ctx: &mut Ctx, preds: &[Predicate<D>]) {
             };
             ctx.sql.push_str(sep);
         }
-        write_pred::<D>(ctx, p);
+        write_pred::<D>(ctx, p)?;
         wrote_any = true;
     }
+    Ok(())
 }
 
-fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate<D>) {
+fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate<D>) -> Result<(), BuildError> {
     match pred {
         Predicate::Binary { col, op, val } => {
             let col = ctx.esc(col);
@@ -632,7 +670,7 @@ fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate<D>) {
             if vals.is_empty() {
                 // Empty IN is always false; empty NOT IN is always true.
                 ctx.sql.push_str(if *neg { "1 = 1" } else { "1 = 0" });
-                return;
+                return Ok(());
             }
             let col = ctx.esc(col);
             ctx.sql.push_str(&col);
@@ -705,7 +743,7 @@ fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate<D>) {
             // `write_wheres` filter them via `is_omitted` (F4), so we never
             // emit invalid `()`.
             ctx.sql.push('(');
-            write_clause_list::<D>(ctx, preds);
+            write_clause_list::<D>(ctx, preds)?;
             ctx.sql.push(')');
         }
         Predicate::Column { lhs, op, rhs } => {
@@ -720,15 +758,16 @@ fn write_pred<D: Dialect>(ctx: &mut Ctx, pred: &Predicate<D>) {
         Predicate::Exists { neg, sub } => {
             ctx.sql
                 .push_str(if *neg { "NOT EXISTS (" } else { "EXISTS (" });
-            compile_into::<D>(ctx, sub);
+            compile_into::<D>(ctx, sub)?;
             ctx.sql.push(')');
         }
         Predicate::InSubquery { col, neg, sub } => {
             let col = ctx.esc(col);
             ctx.sql.push_str(&col);
             ctx.sql.push_str(if *neg { " NOT IN (" } else { " IN (" });
-            compile_into::<D>(ctx, sub);
+            compile_into::<D>(ctx, sub)?;
             ctx.sql.push(')');
         }
     }
+    Ok(())
 }
