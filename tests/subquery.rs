@@ -216,14 +216,40 @@ fn pg_group_in_subquery_and_not_exists() {
                     .select(["user_id"])
                     .where_eq("k", 7i64),
             )
-            .where_not_exists(QueryBuilder::<Postgres>::table("audit").select(["1"]))
+            .where_not_exists(
+                QueryBuilder::<Postgres>::table("audit")
+                    .select(["1"])
+                    .where_eq("level", 3i64),
+            )
+        })
+        .to_sql();
+    // The second sub-query inside the same group continues numbering at $2.
+    assert_eq!(
+        sql,
+        r#"SELECT "id" FROM "users" WHERE ("id" IN (SELECT "user_id" FROM "ban" WHERE "k" = $1) AND NOT EXISTS (SELECT "1" FROM "audit" WHERE "level" = $2))"#
+    );
+    assert_eq!(binds, vec![Value::I64(7), Value::I64(3)]);
+}
+
+#[test]
+fn pg_or_group_with_subquery_first_suppresses_leading_or() {
+    // A subquery predicate as the sole content of an or_where group that is
+    // itself the first WHERE clause: the leading ` OR ` must be suppressed.
+    let (sql, binds) = QueryBuilder::<Postgres>::table("users")
+        .select(["id"])
+        .or_where(|g| {
+            g.where_exists(
+                QueryBuilder::<Postgres>::table("orders")
+                    .select(["1"])
+                    .where_eq("paid", true),
+            )
         })
         .to_sql();
     assert_eq!(
         sql,
-        r#"SELECT "id" FROM "users" WHERE ("id" IN (SELECT "user_id" FROM "ban" WHERE "k" = $1) AND NOT EXISTS (SELECT "1" FROM "audit"))"#
+        r#"SELECT "id" FROM "users" WHERE (EXISTS (SELECT "1" FROM "orders" WHERE "paid" = $1))"#
     );
-    assert_eq!(binds, vec![Value::I64(7)]);
+    assert_eq!(binds, vec![Value::Bool(true)]);
 }
 
 #[test]

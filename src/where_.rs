@@ -339,8 +339,10 @@ impl<D: Dialect> WhereBuilder<D> {
         self
     }
 
-    /// `NOT EXISTS (subquery)` inside this group. See
-    /// [`QueryBuilder::where_not_exists`](crate::QueryBuilder::where_not_exists).
+    /// `NOT EXISTS (subquery)` inside this group. Mirrors
+    /// [`QueryBuilder::where_not_exists`](crate::QueryBuilder::where_not_exists) —
+    /// same contract as [`Self::where_exists`], including placeholder
+    /// continuity into the sub-query.
     pub fn where_not_exists(mut self, sub: QueryBuilder<D>) -> Self {
         self.preds.push(Predicate::Exists {
             neg: true,
@@ -360,8 +362,10 @@ impl<D: Dialect> WhereBuilder<D> {
         self
     }
 
-    /// `col NOT IN (subquery)` inside this group. See
-    /// [`QueryBuilder::where_not_in_subquery`](crate::QueryBuilder::where_not_in_subquery).
+    /// `col NOT IN (subquery)` inside this group. Mirrors
+    /// [`QueryBuilder::where_not_in_subquery`](crate::QueryBuilder::where_not_in_subquery) —
+    /// same contract as [`Self::where_in_subquery`], including placeholder
+    /// continuity into the sub-query.
     pub fn where_not_in_subquery(mut self, col: &str, sub: QueryBuilder<D>) -> Self {
         self.preds.push(Predicate::InSubquery {
             col: col.to_owned(),
