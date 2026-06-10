@@ -2,7 +2,8 @@
 
 /// Escape `\`, `%`, and `_` so user input matches **literally** inside a
 /// `LIKE`/`ILIKE` pattern. The caller still wraps the result in `%…%` /
-/// `…%` as needed.
+/// `…%` as needed — and the result stays a **bind value** (pass it through
+/// `where_like`/a placeholder as usual; never splice it into the SQL text).
 ///
 /// Backslash is escaped first (order matters), then `%` and `_`:
 ///
@@ -20,6 +21,10 @@
 /// matching, pair the escaped pattern with an explicit `ESCAPE '\'` clause
 /// via `where_raw` (on MySQL write the literal as `ESCAPE '\\'`). See the
 /// search-pattern chapter of the book for the full recipe.
+///
+/// Covers the metacharacters of the supported dialects (Postgres, MySQL,
+/// SQLite). `[` — a `LIKE` metacharacter on SQL Server only — is **not**
+/// escaped.
 pub fn escape_like(input: &str) -> String {
     input
         .replace('\\', "\\\\")

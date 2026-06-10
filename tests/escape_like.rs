@@ -24,3 +24,10 @@ fn each_metachar_escaped() {
     assert_eq!(escape_like("_"), "\\_");
     assert_eq!(escape_like("\\"), "\\\\");
 }
+
+#[test]
+fn adjacent_metachars_validate_escape_ordering() {
+    // `\%_` must become `\\` + `\%` + `\_` — a wrong replace order would
+    // double-escape the backslashes produced for `%`/`_`.
+    assert_eq!(escape_like("\\%_"), "\\\\\\%\\_");
+}
