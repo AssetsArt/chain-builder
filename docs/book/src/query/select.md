@@ -94,7 +94,8 @@ Qualified columns work inside aggregates too:
 
 `select_raw(sql, binds)` is the escape hatch for anything the structured API
 does not cover (functions, casts, window expressions). The fragment is
-appended to the column list after any `select` columns; multiple calls
+appended to the column list after any `select` columns and aggregate/alias
+expressions; multiple calls
 accumulate; `binds` is an `Option<Vec<Value>>` (`None` for no binds).
 
 > **⚠️ Positional placeholder contract**

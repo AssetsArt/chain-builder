@@ -191,8 +191,10 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("users")
 ## Groups: `and_where` / `or_where`
 
 To get parentheses and `OR`, pass a closure to `and_where` or `or_where`. The
-closure receives a `WhereBuilder` exposing the same `where_*` methods (plus
-`and_where`/`or_where` again, so groups nest). The method name decides how the
+closure receives a `WhereBuilder` exposing the predicate methods — everything
+except the subquery predicates (`where_exists`, `where_not_exists`,
+`where_in_subquery`, `where_not_in_subquery`) — plus `and_where`/`or_where`
+again, so groups nest. The method name decides how the
 group attaches to what precedes it (`AND (…)` vs `OR (…)`); inside the group,
 predicates are joined with `AND` unless they are themselves `or_where`
 sub-groups:
