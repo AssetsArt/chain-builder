@@ -1,7 +1,7 @@
 /* chain-builder green brand — user-supplied scale, AA-mapped to VitePress tokens. */
 :root {
-  --vp-c-brand-1: #139069; /* links / emphasis on light bg (scale 700) */
-  --vp-c-brand-2: #18b986; /* hover (600) */
+  --vp-c-brand-1: #0d684b; /* links / emphasis on light bg — 6.78:1 on white, AA-normal (scale 800) */
+  --vp-c-brand-2: #139069; /* hover (700) */
   --vp-c-brand-3: #0d684b; /* solid button bg — white text passes AA (800) */
   --vp-c-brand-soft: rgba(27, 207, 150, 0.14);
 
