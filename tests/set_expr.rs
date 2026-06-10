@@ -1,6 +1,6 @@
 //! 3.1.0: UPDATE expressions — `set_raw`, `increment`, `decrement`.
 
-use chain_builder::{Postgres, QueryBuilder, Sqlite, Value};
+use chain_builder::{MySql, Postgres, QueryBuilder, Sqlite, Value};
 
 #[test]
 fn pg_update_with_increment_and_raw() {
@@ -103,4 +103,30 @@ fn method_switch_away_from_update_ignores_exprs() {
         .to_sql();
     assert_eq!(sql, r#"INSERT INTO "t" ("a") VALUES (?)"#);
     assert_eq!(binds, vec![Value::I64(1)]);
+}
+
+#[test]
+fn pg_step_bind_advances_counter_before_raw() {
+    // The increment's bind goes through the placeholder counter ($1), so a
+    // following set_raw with its own bind must hand-write $2; WHERE is $3.
+    let (sql, binds) = QueryBuilder::<Postgres>::table("t")
+        .increment("views", 1i64)
+        .set_raw("total", "price * $2", vec![Value::I64(4)])
+        .where_eq("id", 9i64)
+        .to_sql();
+    assert_eq!(
+        sql,
+        r#"UPDATE "t" SET "views" = "views" + $1, "total" = price * $2 WHERE "id" = $3"#
+    );
+    assert_eq!(binds, vec![Value::I64(1), Value::I64(4), Value::I64(9)]);
+}
+
+#[test]
+fn mysql_increment_backtick_quotes_both_sides() {
+    let (sql, binds) = QueryBuilder::<MySql>::table("t")
+        .increment("views", 1i64)
+        .where_eq("id", 9i64)
+        .to_sql();
+    assert_eq!(sql, "UPDATE `t` SET `views` = `views` + ? WHERE `id` = ?");
+    assert_eq!(binds, vec![Value::I64(1), Value::I64(9)]);
 }

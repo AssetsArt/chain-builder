@@ -813,10 +813,11 @@ impl<D: Dialect> QueryBuilder<D> {
     /// # Warning: positional placeholder contract
     ///
     /// `expr` is NOT escaped or renumbered. For **Postgres**, hand-write
-    /// `$N` matching the actual bind position — `SET` precedes `WHERE`, so
-    /// that is `structured SET binds + binds of earlier expressions + 1`,
-    /// `+2`, … For MySQL/SQLite use `?`. A wrong `$N` produces a malformed
-    /// query.
+    /// `$N` matching the actual bind position at the point this expression
+    /// is reached — `SET` precedes `WHERE`, so that is `(number of
+    /// structured SET binds) + (binds of all earlier expressions, counting
+    /// 1 per preceding `increment`/`decrement`) + 1`, `+2`, … For
+    /// MySQL/SQLite use `?`. A wrong `$N` produces a malformed query.
     ///
     /// ```
     /// use chain_builder::{Postgres, QueryBuilder, Value};
