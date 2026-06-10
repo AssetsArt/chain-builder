@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: chain-builder
+  name: Chain builder
   text: Typed SQL query builder for Rust
   tagline: One dialect-aware builder for PostgreSQL, MySQL, and SQLite — values always bound, identifiers always escaped.
   actions:

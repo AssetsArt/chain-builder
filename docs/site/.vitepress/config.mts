@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 const repo = 'https://github.com/AssetsArt/chain-builder'
 
 export default defineConfig({
-  title: 'chain-builder',
+  title: 'Chain builder',
   description:
     'A typed, dialect-aware SQL query builder for Rust (PostgreSQL/MySQL/SQLite)',
   base: '/chain-builder/',

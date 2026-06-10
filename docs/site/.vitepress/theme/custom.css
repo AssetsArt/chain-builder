@@ -16,3 +16,10 @@
   --vp-c-brand-3: #139069; /* solid button bg on dark (700) */
   --vp-c-brand-soft: rgba(27, 207, 150, 0.16);
 }
+
+/* Widen the nav search box — the default button reads too short. */
+@media (min-width: 768px) {
+  .DocSearch-Button {
+    min-width: 280px;
+  }
+}
