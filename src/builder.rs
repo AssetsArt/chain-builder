@@ -1332,4 +1332,53 @@ impl<D: Dialect> QueryBuilder<D> {
     pub fn try_to_sql(&self) -> Result<(String, Vec<Value>), BuildError> {
         try_compile(self)
     }
+
+    /// Render the compiled query as a human-readable string for logs and
+    /// debugging: the SQL, then one indented line per bind.
+    ///
+    /// ```
+    /// use chain_builder::{Postgres, QueryBuilder};
+    /// let qb = QueryBuilder::<Postgres>::table("users")
+    ///     .select(["id"])
+    ///     .where_eq("status", "active");
+    /// assert_eq!(
+    ///     qb.to_sql_pretty(),
+    ///     "SELECT \"id\" FROM \"users\" WHERE \"status\" = $1\nbinds:\n  $1 = Text(\"active\")"
+    /// );
+    /// ```
+    ///
+    /// Bind labels are the dialect placeholder (`$1`, `$2`, … on Postgres);
+    /// dialects whose placeholder is a bare `?` get a 1-based ordinal
+    /// appended for readability (`?1`, `?2`, …) — the SQL itself still uses
+    /// `?`. With zero binds the output is the SQL line only. The output
+    /// format is for humans and is **not** a stability contract.
+    ///
+    /// Panicking twin of [`Self::try_to_sql_pretty`]; the panic message is
+    /// the [`BuildError`]'s `Display` text (same policy as
+    /// [`Self::to_sql`]).
+    pub fn to_sql_pretty(&self) -> String {
+        self.try_to_sql_pretty().unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Fallible twin of [`Self::to_sql_pretty`]; surfaces the same
+    /// [`BuildError`] as [`Self::try_to_sql`].
+    pub fn try_to_sql_pretty(&self) -> Result<String, BuildError> {
+        let (sql, binds) = try_compile(self)?;
+        let mut out = sql;
+        if !binds.is_empty() {
+            out.push_str("\nbinds:");
+            for (i, b) in binds.iter().enumerate() {
+                let mut label = String::new();
+                D::write_placeholder(&mut label, i + 1);
+                if label == "?" {
+                    label.push_str(&(i + 1).to_string());
+                }
+                out.push_str("\n  ");
+                out.push_str(&label);
+                out.push_str(" = ");
+                out.push_str(&format!("{b:?}"));
+            }
+        }
+        Ok(out)
+    }
 }
