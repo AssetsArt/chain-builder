@@ -46,7 +46,9 @@ let (sql, _) = QueryBuilder::<Postgres>::table("orders")
 `group_by_raw(sql, binds)` is the escape hatch for grouping by an expression
 (function call, date truncation, …). The fragment is appended after any
 structured `group_by` columns within the same `GROUP BY` clause; if no
-structured columns are present it becomes the whole clause:
+structured columns are present it becomes the whole clause. Repeated
+`group_by_raw`/`order_by_raw` calls replace the previous fragment (unlike the
+accumulating structured methods):
 
 ```rust,ignore
 let (sql, binds) = QueryBuilder::<Postgres>::table("t")
@@ -93,7 +95,7 @@ let (sql, binds) = QueryBuilder::<Postgres>::table("orders")
 
 ### The operator allowlist (injection guard)
 
-Unlike `where_eq`/`where_column`/`JoinClause::on`, which take
+Unlike `where_column`/`JoinClause::on`/`on_val`, which take
 `op: &'static str` (so only compile-time literals are accepted), `having`
 takes `op: &str` for ergonomics. Because the operator is emitted **verbatim**
 into the SQL — it is not a bound value and cannot be escaped without changing
