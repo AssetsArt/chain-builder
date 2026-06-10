@@ -31,24 +31,25 @@ the real release commit.
 
 Mirror what `publish.yml` enforces (hard gates), before opening the PR:
 ```bash
-cargo test --features dev-dependencies --no-fail-fast   # publish.yml runs this
-cargo publish --dry-run                                  # publish.yml runs this (packaging)
+cargo test --features sqlx_postgres,sqlx_sqlite --no-fail-fast   # publish.yml runs this
+cargo publish --dry-run                                           # publish.yml runs this (packaging)
 ```
-Recommended hygiene (not gated by `publish.yml`, but keep the tree clean):
+Recommended hygiene (also enforced by `ci.yml` on the PR):
 ```bash
 cargo fmt --all --check
-cargo build --no-default-features --features sqlx_sqlite,sqlite   # sqlite-only must compile
-cargo clippy --features dev-dependencies                         # advisory: a few pre-existing lints exist
+cargo clippy --all-features --all-targets -- -D warnings
+cargo test --all-features
 ```
 Then: `git push origin <branch>` and `gh pr create --base main --head <branch> …`.
 
-> Note: this repo has **no separate PR-CI workflow** — `publish.yml` only runs on
-> tags. So the local pre-flight above IS the pre-merge gate; run it yourself.
+> Note: the repo HAS PR CI — `ci.yml` (fmt + clippy + build + test) runs on
+> push and PR, and `docs.yml` builds the mdBook on PR. `publish.yml` only runs
+> on tags. The local pre-flight catches problems before you burn CI cycles.
 
 ## 3. Wait for checks — GREEN before merge
 
 ```bash
-gh pr checks <pr#> --watch      # if/when PR checks exist; otherwise rely on local pre-flight
+gh pr checks <pr#> --watch      # ci.yml + docs.yml must be green
 ```
 Do not proceed until everything passes. If red, fix on the branch and repeat.
 
@@ -74,17 +75,12 @@ sed -i '' "s/^version = \"$OLD\"/version = \"$NEW\"/" Cargo.toml
 cargo build >/dev/null         # rewrites chain-builder's version in Cargo.lock
 #   (or: cargo update -p chain-builder --precise $NEW)
 
-# 3) README install examples (4 pins) — set them all to $NEW.
-#    NOTE: README pins may LAG behind Cargo.toml (e.g. README at 1.0.0 while the
-#    crate is 1.0.1). Find their current value first, then replace that → $NEW:
-grep -n 'chain-builder = ' README.md           # see what the pins currently say
-README_OLD=1.0.0                                # ← set from the grep above
-sed -i '' "s/chain-builder = \"$README_OLD\"/chain-builder = \"$NEW\"/g" README.md
-sed -i '' "s/chain-builder = { version = \"$README_OLD\"/chain-builder = { version = \"$NEW\"/g" README.md
+# 3) README install pin — currently a MAJOR-only pin (`version = "3"`), so it
+#    only moves on a major bump. Verify it still matches the new version:
+grep -n 'chain-builder = ' README.md           # e.g. version = "3" covers 3.x
 
-# Verify Cargo.toml/lock no longer mention $OLD, and README pins are all $NEW:
+# Verify Cargo.toml/lock no longer mention $OLD:
 grep -rn "$OLD" Cargo.toml Cargo.lock          # expect: no chain-builder lines
-grep -n 'chain-builder = ' README.md           # expect: all show $NEW
 ```
 
 Then update `CHANGELOG.md`: rename the `## [Unreleased]` heading to
@@ -125,6 +121,6 @@ Confirm on crates.io: <https://crates.io/crates/chain-builder/versions>.
   skips the tag-match check but still calls `cargo publish`.
 - **Pre-releases**: a version with a suffix (e.g. `1.0.2-alpha.1`) publishes fine
   and is excluded from default `^` version requirements — handy for test releases.
-- **Feature combos**: `publish.yml` tests with `dev-dependencies` (mysql+sqlite);
-  the package shipped to crates.io builds with default features (mysql +
-  sqlx_mysql). The `--dry-run` step packages exactly what users get.
+- **Feature combos**: `publish.yml` tests with `sqlx_postgres,sqlx_sqlite`;
+  the package shipped to crates.io builds with default features. The
+  `--dry-run` step packages exactly what users get.
